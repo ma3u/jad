@@ -41,7 +41,7 @@ concurrency:
 
 
 jobs:
-  e2e-Tests:
+  E2E-Tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
