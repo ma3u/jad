@@ -130,7 +130,7 @@ spec:
               {
                 "role_type": "jwt",
                 "user_claim": "participant_context_id",
-                "bound_issuer": "http://auth.vps.beardyinc.com/realms/edcv",
+                "bound_issuer": "http://vault.localhost/realms/edcv",
                 "bound_claims": {
                   "role": "participant"
                 },
@@ -163,8 +163,7 @@ metadata:
   namespace: edc-v
 spec:
   rules:
-#    - host: vault.localhost
-    - host: vault.vps.beardyinc.com
+    - host: vault.localhost
       http:
         paths:
           - path: /

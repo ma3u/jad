@@ -1,0 +1,21 @@
+{
+  "participantContextId": "{{participant_context_id}}",
+  "identity": "{{participant_context_id}}",
+  "participantId": "{{participant_context_did}}",
+  "isActive": true,
+  "tokenUrl": "http://identityhub.edc-v.svc.cluster.local:7084/api/sts/token",
+  "clientSecret": "{{tenant_clientSecret}}",
+  "clientId": "{{tenant_clientId}}",
+  "vaultConfig": {
+    "credentials": {
+      "clientId": "{{participant_context_id}}-vault",
+      "clientSecret": "{{participant_context_id}}-secret",
+      "tokenUrl": "http://keycloak.edc-v.svc.cluster.local:8080/realms/edcv/protocol/openid-connect/token"
+    },
+    "config": {
+      "secretPath": "v1/participants",
+      "folderPath": "{{participant_context_id}}/identityhub",
+      "vaultUrl": "http://vault.edc-v.svc.cluster.local:8200"
+    }
+  }
+}

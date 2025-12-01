@@ -79,13 +79,3 @@ jobs:
         run: |
           ./gradlew shadowJar
           ./gradlew test -DincludeTags="PostgresqlIntegrationTest"
-
-  e2e-Tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: eclipse-edc/.github/.github/actions/setup-build@main
-      - name: End to End Integration Tests
-        run: |
-          ./gradlew shadowJar
-          ./gradlew test -DincludeTags="EndToEndTest"

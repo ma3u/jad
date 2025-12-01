@@ -29,47 +29,47 @@ auth:oauth2 {
 
 body:json {
   {
-      "clientId": "{{participant_context_id}}-vault",
-      "name": "{{participant_context_id}} Client",
-      "description": "Client for API access",
-      "enabled": true,
-      "secret": "{{participant_context_id}}-secret",
-      "protocol": "openid-connect",
-      "publicClient": false,
-      "serviceAccountsEnabled": true,
-      "standardFlowEnabled": false,
-      "directAccessGrantsEnabled": false,
-      "fullScopeAllowed": true,
-      "protocolMappers": [
-          {
-              "name": "participantContextId",
-              "protocol": "openid-connect",
-              "protocolMapper": "oidc-hardcoded-claim-mapper",
-              "consentRequired": false,
-              "config": {
-                  "claim.name": "participant_context_id",
-                  "claim.value": "{{participant_context_id}}",
-                  "jsonType.label": "String",
-                  "access.token.claim": "true",
-                  "id.token.claim": "true",
-                  "userinfo.token.claim": "true"
-              }
-          },
-          {
-              "name": "role",
-              "protocol": "openid-connect",
-              "protocolMapper": "oidc-hardcoded-claim-mapper",
-              "consentRequired": false,
-              "config": {
-                  "claim.name": "role",
-                  "claim.value": "participant",
-                  "jsonType.label": "String",
-                  "access.token.claim": "true",
-                  "id.token.claim": "true",
-                  "userinfo.token.claim": "true"
-              }
-          }
-      ]
+    "clientId": "{{participant_context_id}}-vault",
+    "name": "{{participant_context_id}} Client",
+    "description": "Client for API access",
+    "enabled": true,
+    "secret": "{{participant_context_id}}-secret",
+    "protocol": "openid-connect",
+    "publicClient": false,
+    "serviceAccountsEnabled": true,
+    "standardFlowEnabled": false,
+    "directAccessGrantsEnabled": false,
+    "fullScopeAllowed": true,
+    "protocolMappers": [
+      {
+        "name": "participantContextId",
+        "protocol": "openid-connect",
+        "protocolMapper": "oidc-hardcoded-claim-mapper",
+        "consentRequired": false,
+        "config": {
+          "claim.name": "participant_context_id",
+          "claim.value": "{{participant_context_id}}",
+          "jsonType.label": "String",
+          "access.token.claim": "true",
+          "id.token.claim": "true",
+          "userinfo.token.claim": "true"
+        }
+      },
+      {
+        "name": "role",
+        "protocol": "openid-connect",
+        "protocolMapper": "oidc-hardcoded-claim-mapper",
+        "consentRequired": false,
+        "config": {
+          "claim.name": "role",
+          "claim.value": "participant",
+          "jsonType.label": "String",
+          "access.token.claim": "true",
+          "id.token.claim": "true",
+          "userinfo.token.claim": "true"
+        }
+      }
+    ]
   }
 }
 
