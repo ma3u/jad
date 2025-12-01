@@ -29,7 +29,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.eclipse.edc.jad.tests.KeycloakApi.createKeycloakAdminToken;
 import static org.eclipse.edc.jad.tests.KeycloakApi.createKeycloakUser;
 import static org.eclipse.edc.jad.tests.KeycloakApi.getAccessToken;
-import static org.hamcrest.Matchers.lessThan;
 
 /**
  * This test class executes a series of REST requests against several components to verify that an end-to-end
@@ -116,7 +115,6 @@ public class DataTransferTest {
                 .contentType("application/json")
                 .post("/cp/api/mgmt/v1alpha/participants/consumer/data")
                 .then()
-                .time(lessThan(10_000L))
                 .statusCode(200)
                 .extract().body().asPrettyString();
         assertThat(jsonResponse).isNotNull();

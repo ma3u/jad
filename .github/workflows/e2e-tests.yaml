@@ -18,20 +18,27 @@
 #
 
 ---
-name: "E2E Tests"
+name: "Run E2E Tests"
 
 on:
+  push:
+  pull_request:
+
   workflow_run:
-    workflows: [ "Verify" ]
+    workflows: [ "Draft Release" ]
     types:
       - completed
-    branches: [ main ]
 
   schedule:
     - cron: '0 3 * * *'  # Run at 3am UTC every day
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 
 jobs:
   e2e-Tests:
@@ -46,7 +53,7 @@ jobs:
       - name: "Build runtime images"
         run: |
           ./gradlew dockerize
-          docker buildx build -f launchers/postgres/Dockerfile --platform linux/amd64,linux/arm64 -t ghcr.io/metaform/jad/postgres:wal2json launchers/postgres
+          docker buildx build -f launchers/postgres/Dockerfile -t ghcr.io/metaform/jad/postgres:wal2json launchers/postgres
 
       - name: "Create k8s Kind Cluster"
         uses: helm/kind-action@v1.12.0
@@ -56,11 +63,12 @@ jobs:
 
       - name: "Load runtime images into KinD"
         run: |
-          kind load docker-image ghcr.io/metaform/jad/postgres:wal2json \
-                                ghcr.io/metaform/jad/controlplane:latest
+          kind load docker-image -n jad ghcr.io/metaform/jad/postgres:wal2json \
+                                ghcr.io/metaform/jad/controlplane:latest \
                                 ghcr.io/metaform/jad/dataplane:latest \
-                                ghcr.io/metaform/jad/identity-hub:latest
-                                ghcr.io/metaform/jad/issuerservice:latest -n jad
+                                ghcr.io/metaform/jad/identity-hub:latest \
+                                ghcr.io/metaform/jad/issuerservice:latest \
+                                
 
       - name: "Install nginx ingress controller"
         run: |-
@@ -71,9 +79,9 @@ jobs:
             --timeout=90s
       - name: "Deploy JAD"
         run: |
+          grep -rlZ "imagePullPolicy:.*Always" . | xargs sed -i "s/imagePullPolicy:.*Always/imagePullPolicy: Never/g"
           kubectl apply -k k8s
           kubectl rollout status deployment -n edc-v \
-            -l type=edcv-app \
             --timeout=120s
 
       - name: "Run E2E Test"

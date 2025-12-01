@@ -18,7 +18,6 @@ package org.eclipse.edc.jad.tests.model;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
-import java.util.Collection;
 import java.util.List;
 
 /**

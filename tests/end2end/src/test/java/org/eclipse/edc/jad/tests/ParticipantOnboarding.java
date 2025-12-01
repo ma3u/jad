@@ -22,7 +22,6 @@ import java.util.Base64;
 import java.util.UUID;
 
 import static io.restassured.RestAssured.given;
-import static java.util.concurrent.TimeUnit.MINUTES;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
 import static org.eclipse.edc.jad.tests.DataTransferTest.API_ADMIN_KEY;
