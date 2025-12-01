@@ -12,17 +12,17 @@
 #
 
 resources:
-  - edcv-namespace.yaml
-  - postgres.yaml
-  - nats.yaml
-  - keycloak.yaml
-  - vault.yaml
-  - controlplane-config.yaml
-  - controlplane.yaml
-  - dataplane-config.yaml
-  - dataplane.yaml
-  - issuerservice-config.yaml
-  - issuerservice.yaml
-  - identityhub-config.yaml
-  - identityhub.yaml
+  - base/edcv-namespace.yaml
+  - base/postgres.yaml
+  - base/nats.yaml
+  - base/keycloak.yaml
+  - base/vault.yaml
+  - apps/controlplane-config.yaml
+  - apps/controlplane.yaml
+  - apps/dataplane-config.yaml
+  - apps/dataplane.yaml
+  - apps/issuerservice-config.yaml
+  - apps/issuerservice.yaml
+  - apps/identityhub-config.yaml
+  - apps/identityhub.yaml
 

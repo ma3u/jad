@@ -194,7 +194,7 @@ Create another environment to suit your setup:
 
 ### Update deployment manifests
 
-in [keycloak.yaml](k8s/keycloak.yaml) and [vault.yaml](k8s/vault.yaml), update the `host` fields in the `Ingress`
+in [keycloak.yaml](k8s/base/keycloak.yaml) and [vault.yaml](k8s/base/vault.yaml), update the `host` fields in the `Ingress`
 resources to match your DNS:
 
 ```yaml
@@ -204,7 +204,7 @@ spec:
       http:
 ```
 
-Next, in the [controlplane-config.yaml](./k8s/controlplane-config.yaml) change the expected issuer URL to match your
+Next, in the [controlplane-config.yaml](k8s/apps/controlplane-config.yaml) change the expected issuer URL to match your
 DNS:
 ```yaml
 edc.iam.oauth2.issuer: "http://keycloak.localhost/realms/edcv" # change to "http://auth.yourdomain.com/realms/edcv"
