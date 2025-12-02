@@ -30,6 +30,7 @@ spec:
       labels:
         app: controlplane
         platform: edcv
+        type: edcv-app
     spec:
       containers:
         - name: controlplane

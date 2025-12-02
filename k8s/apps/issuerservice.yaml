@@ -30,6 +30,7 @@ spec:
       labels:
         app: issuerservice
         platform: edcv
+        type: edcv-app
     spec:
       containers:
         - name: issuerservice

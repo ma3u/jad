@@ -84,7 +84,7 @@ jobs:
           # the safest way to avoid race conditions between apps and infra, e.g. vault.
           
           kubectl apply -f k8s/base
-          kubectl wait --for=condition=Ready pods --all -n edc-v --timeout=300s
+          kubectl wait --for=condition=Ready pods --all -n edc-v --timeout=90s
 
       - name: "Deploy JAD applications"
         run: |-
@@ -92,7 +92,10 @@ jobs:
           grep -rlZ "imagePullPolicy:.*Always" . | xargs sed -i "s/imagePullPolicy:.*Always/imagePullPolicy: Never/g"
           
           kubectl apply -f k8s/apps
-          kubectl wait --for=condition=Ready pods --all -n edc-v --timeout=300s
+          kubectl wait --namespace edc-v \
+            --for=condition=ready pod \
+            --selector=type=edcv-app \
+            --timeout=90s
           
       - name: "Run E2E Test"
         run: |

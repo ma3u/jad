@@ -30,6 +30,7 @@ spec:
       labels:
         app: dataplane
         platform: edcv
+        type: edcv-app
     spec:
       containers:
         - name: dataplane
