@@ -60,7 +60,6 @@ dependencies {
 
     runtimeOnly(project(":extensions:api:mgmt"))
     runtimeOnly(project(":extensions:dcp-impl"))
-    runtimeOnly(project(":extensions:seed:nats"))
 }
 
 tasks.withType<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar> {

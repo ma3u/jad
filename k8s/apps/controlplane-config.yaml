@@ -38,8 +38,10 @@ data:
 
   # NATS config
   edc.nats.cn.subscriber.url: "nats://nats.edc-v.svc.cluster.local:4222"
+  edc.nats.cn.subscriber.autocreate: "true"
   edc.nats.cn.publisher.url: "nats://nats.edc-v.svc.cluster.local:4222"
   edc.nats.tp.subscriber.url: "nats://nats.edc-v.svc.cluster.local:4222"
+  edc.nats.tp.subscriber.autocreate: "true"
   edc.nats.tp.publisher.url: "nats://nats.edc-v.svc.cluster.local:4222"
   edc.postgres.cdc.url: "jdbc:postgresql://postgres.edc-v.svc.cluster.local:5432/controlplane"
   edc.postgres.cdc.user: "cp"
