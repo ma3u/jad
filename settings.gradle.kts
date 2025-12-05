@@ -26,7 +26,6 @@ pluginManagement {
 
 rootProject.name = "jad"
 include(":extensions:api:mgmt")
-include(":extensions:dcp-impl")
 include(":extensions:data-plane-public-api-v2")
 include(":tests:end2end")
 

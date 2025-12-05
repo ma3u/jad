@@ -59,7 +59,6 @@ dependencies {
     runtimeOnly(libs.bouncyCastle.bcprovJdk18on)
 
     runtimeOnly(project(":extensions:api:mgmt"))
-    runtimeOnly(project(":extensions:dcp-impl"))
 }
 
 tasks.withType<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar> {

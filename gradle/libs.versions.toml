@@ -26,6 +26,7 @@ edc-core-runtime = { module = "org.eclipse.edc:runtime-core", version.ref = "edc
 edc-core-participantcontext-config = { module = "org.eclipse.edc:participant-context-config-core", version.ref = "edc" }
 edc-core-edrstore = { module = "org.eclipse.edc:edr-store-core", version.ref = "edc" }
 edc-dcp = { module = "org.eclipse.edc:decentralized-claims-service", version.ref = "edc" }
+edc-dcp-trustedissuers = { module = "org.eclipse.edc:decentralized-claims-issuers-configuration", version.ref = "edc" }
 edc-api-observability = { module = "org.eclipse.edc:api-observability", version.ref = "edc" }
 edc-junit = { module = "org.eclipse.edc:junit", version.ref = "edc" }
 edc-core-dataplane-selector = { module = "org.eclipse.edc:data-plane-selector-core", version.ref = "edc" }
@@ -57,6 +58,7 @@ edcv-nats-publisher-tp = { module = "org.eclipse.edc.virtualized:transfer-proces
 edcv-nats-publisher-cn = { module = "org.eclipse.edc.virtualized:negotiation-cdc-publisher-nats", version.ref = "edc" }
 edcv-cel-extension = { module = "org.eclipse.edc.virtualized:cel-extension", version.ref = "edc" }
 edcv-cel-store-sql = { module = "org.eclipse.edc.virtualized:cel-store-sql", version.ref = "edc" }
+edcv-core-dcp-scope = { module = "org.eclipse.edc.virtualized:dcp-scope-core", version.ref = "edc" }
 
 # EDC spi dependencies
 edc-spi-participantcontext = { module = "org.eclipse.edc:connector-participant-context-spi", version.ref = "edc" }
@@ -113,6 +115,8 @@ dcp = [
     "edc-did-web",
     "edc-oauth2-client",
     "edc-dcp-core",
+    "edcv-core-dcp-scope",
+    "edc-dcp-trustedissuers"
 ]
 
 [plugins]
