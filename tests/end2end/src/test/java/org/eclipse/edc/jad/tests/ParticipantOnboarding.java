@@ -14,7 +14,6 @@
 
 package org.eclipse.edc.jad.tests;
 
-import io.restassured.specification.RequestSpecification;
 import org.eclipse.edc.jad.tests.model.ClientCredentials;
 import org.eclipse.edc.jad.tests.model.Orchestration;
 import org.eclipse.edc.spi.monitor.Monitor;
@@ -29,15 +28,22 @@ import static org.awaitility.Awaitility.await;
 import static org.eclipse.edc.jad.tests.Constants.BASE_URL;
 import static org.eclipse.edc.jad.tests.KeycloakApi.createKeycloakToken;
 
+/**
+ * Takes care of onboarding a single participant into the test Dataspace
+ *
+ * @param participantName       A human-readable name for the participant. Will be used to create a tenant in CFM
+ * @param participantContextDid The Web:DID of the participant.
+ * @param vaultToken            A token for Hashicorp Vault which grants access to the {@code v1/secret} secret engine.
+ * @param monitor               A monitor for some logging
+ */
 public record ParticipantOnboarding(String participantName, String participantContextDid,
                                     String vaultToken, Monitor monitor) {
 
-    public ClientCredentials execute(String cellId, String dataspaceProfileId) {
+    public ClientCredentials execute(String cellId) {
 
         monitor.info("Creating tenant for %s".formatted(participantName));
         var tenantId = createTenant(participantName);
         monitor.info("Deploy dataspace profile");
-        deployDataspaceProfile(dataspaceProfileId, cellId);
         monitor.info("Deploy participant profile");
         var profileId = deployParticipantProfile(tenantId, cellId, participantContextDid);
 
@@ -76,8 +82,16 @@ public record ParticipantOnboarding(String participantName, String participantCo
                 .extract().body().jsonPath().getString("data.data.content");
     }
 
+    /**
+     * Retrieves an Orchestration object by its ID.
+     *
+     * @param orchestrationId the unique identifier of the orchestration to retrieve
+     * @return the Orchestration object
+     */
     private Orchestration getOrchestrationById(String orchestrationId) {
-        return pmRequest()
+        return given()
+                .baseUri(Constants.PM_BASE_URL)
+                .contentType(Constants.APPLICATION_JSON)
                 .get("/api/v1alpha1/orchestrations/%s".formatted(orchestrationId))
                 .then()
                 .log().ifValidationFails()
@@ -85,16 +99,24 @@ public record ParticipantOnboarding(String participantName, String participantCo
                 .extract().body().as(Orchestration.class);
     }
 
-    private String queryOrchestrationByProfileId(String profileId) {
+    /**
+     * Queries an orchestration object by its correlation ID, which is the participantProfileID
+     *
+     * @param participantProfileId the participant profile ID
+     * @return the orchestration ID
+     */
+    private String queryOrchestrationByProfileId(String participantProfileId) {
         var orchestrationId = new AtomicReference<String>();
         await().atMost(20, SECONDS)
                 .pollInterval(1, SECONDS).untilAsserted(() -> {
-                    var body = pmRequest()
+                    var body = given()
+                            .baseUri(Constants.PM_BASE_URL)
+                            .contentType(Constants.APPLICATION_JSON)
                             .body("""
                                     {
                                          "predicate": "correlationId = '%s'"
                                     }
-                                    """.formatted(profileId))
+                                    """.formatted(participantProfileId))
                             .post("/api/v1alpha1/orchestrations/query")
                             .then()
                             .log().ifValidationFails()
@@ -107,8 +129,18 @@ public record ParticipantOnboarding(String participantName, String participantCo
     }
 
 
+    /**
+     * Deploys (and creates) a participant profile in CFM.
+     *
+     * @param tenantId              the tenant ID.
+     * @param cellId                the cell ID.
+     * @param participantContextDid the Web:DID of the participant.
+     * @return the participant profile ID.
+     */
     private String deployParticipantProfile(String tenantId, String cellId, String participantContextDid) {
-        return tmRequest()
+        return given()
+                .baseUri(Constants.TM_BASE_URL)
+                .contentType(Constants.APPLICATION_JSON)
                 .body("""
                         {
                             "identifier": "%s",
@@ -123,30 +155,25 @@ public record ParticipantOnboarding(String participantName, String participantCo
                 .extract().body().jsonPath().getString("id");
     }
 
-    private void deployDataspaceProfile(String dataspaceProfileId, String cellId) {
-        tmRequest()
-                .body("""
-                        {
-                            "profileId": "%s",
-                            "cellId": "%s"
-                        }
-                        """.formatted(dataspaceProfileId, cellId))
-                .post("/api/v1alpha1/dataspace-profiles/%s/deployments".formatted(dataspaceProfileId))
-                .then()
-                .log().ifValidationFails()
-                .statusCode(202);
-    }
 
-    private String createTenant(String participantContextId) {
-        return tmRequest()
+    /**
+     * Creates a tenant in CFM.
+     *
+     * @param tenantName thhe name of the tenant. only used for display purposes
+     * @return the tenant ID.
+     */
+    private String createTenant(String tenantName) {
+        return given()
+                .baseUri(Constants.TM_BASE_URL)
+                .contentType(Constants.APPLICATION_JSON)
                 .body("""
                         {
                             "properties": {
-                                "name": "%s tenant",
+                                "name": "%s",
                                 "location": "eu"
                             }
                         }
-                        """.formatted(participantContextId))
+                        """.formatted(tenantName))
                 .post("/api/v1alpha1/tenants")
                 .then()
                 .log().ifValidationFails()
@@ -154,18 +181,6 @@ public record ParticipantOnboarding(String participantName, String participantCo
                 .extract().body().jsonPath().getString("id");
     }
 
-
-    private RequestSpecification tmRequest() {
-        return given()
-                .baseUri(Constants.TM_BASE_URL)
-                .contentType(Constants.APPLICATION_JSON);
-    }
-
-    private RequestSpecification pmRequest() {
-        return given()
-                .baseUri(Constants.PM_BASE_URL)
-                .contentType(Constants.APPLICATION_JSON);
-    }
 
     private void waitForCredentialIssuance(String participantContextId, String userToken, String holderPid) {
         await().atMost(20, SECONDS)

@@ -66,16 +66,17 @@ public class DataTransferTest {
         monitor.info("Create cell and dataspace profile");
         var cellId = createCell();
         var dataspaceProfileId = createDataspaceProfile();
+        deployDataspaceProfile(dataspaceProfileId, cellId);
 
         // onboard consumer
         monitor.info("Onboarding consumer");
         var po = new ParticipantOnboarding("consumer", "did:web:identityhub.edc-v.svc.cluster.local%3A7083:consumer", VAULT_TOKEN, monitor.withPrefix("Consumer"));
-        var consumerCredentials = po.execute(cellId, dataspaceProfileId);
+        var consumerCredentials = po.execute(cellId);
 
         // onboard provider
         monitor.info("Onboarding provider");
         var providerPo = new ParticipantOnboarding("provider", "did:web:identityhub.edc-v.svc.cluster.local%3A7083:provider", VAULT_TOKEN, monitor.withPrefix("Provider"));
-        var providerCredentials = providerPo.execute(cellId, dataspaceProfileId);
+        var providerCredentials = providerPo.execute(cellId);
 
         // seed provider
         monitor.info("Seeding provider");
@@ -112,23 +113,6 @@ public class DataTransferTest {
         assertThat(jsonResponse).isNotNull();
     }
 
-    private void registerDataplane(String participantContextId, String accessToken) {
-        given()
-                .baseUri(BASE_URL)
-                .contentType(APPLICATION_JSON)
-                .auth().oauth2(accessToken)
-                .body("""
-                        {
-                            "allowedSourceTypes": [ "HttpData" ],
-                            "allowedTransferTypes": [ "HttpData-PULL" ],
-                            "url": "http://dataplane.edc-v.svc.cluster.local:8083/api/control/v1/dataflows"
-                        }
-                        """)
-                .post("/cp/api/mgmt/v4alpha/dataplanes/%s".formatted(participantContextId))
-                .then()
-                .log().ifValidationFails()
-                .statusCode(204);
-    }
 
     private CatalogResponse fetchCatalog(ClientCredentials consumerCredentials) {
         var accessToken = getAccessToken(consumerCredentials.clientId(), consumerCredentials.clientSecret(), "management-api:read");
@@ -166,6 +150,11 @@ public class DataTransferTest {
                 .extract().body().jsonPath().getString("id");
     }
 
+    /**
+     * Creates a cell in CFM.
+     *
+     * @return the Cell ID
+     */
     private String createCell() {
         return given()
                 .contentType(APPLICATION_JSON)
@@ -184,6 +173,33 @@ public class DataTransferTest {
                 .extract().jsonPath().getString("id");
     }
 
+    /**
+     * Deploys a dataspace profile in CFM.
+     *
+     * @param dataspaceProfileId the dataspace profile ID to deploy
+     * @param cellId             the cell ID to deploy the profile to
+     */
+    private void deployDataspaceProfile(String dataspaceProfileId, String cellId) {
+        given()
+                .baseUri(TM_BASE_URL)
+                .contentType(APPLICATION_JSON)
+                .body("""
+                        {
+                            "profileId": "%s",
+                            "cellId": "%s"
+                        }
+                        """.formatted(dataspaceProfileId, cellId))
+                .post("/api/v1alpha1/dataspace-profiles/%s/deployments".formatted(dataspaceProfileId))
+                .then()
+                .log().ifValidationFails()
+                .statusCode(202);
+    }
+
+    /**
+     * Creates a Common Expression Language (CEL) entry in the control plane
+     *
+     * @param accessToken OAuth2 token
+     */
     private void createCelExpression(String accessToken) {
         var template = loadResourceFile("create_cel_expression.json");
 
@@ -195,6 +211,31 @@ public class DataTransferTest {
                 .post("/cp/api/mgmt/v4alpha/celexpressions")
                 .then()
                 .statusCode(200);
+    }
+
+    /**
+     * Registers a data plane for a new participant context. This is a bit of a workaround, until Dataplane Signaling is fully implemented.
+     * Check also the {@code DataplaneRegistrationApiController} in the {@code extensions/api/mgmt} directory
+     *
+     * @param participantContextId Participant context for which the data plane should be registered.
+     * @param accessToken          OAuth2 token
+     */
+    private void registerDataplane(String participantContextId, String accessToken) {
+        given()
+                .baseUri(BASE_URL)
+                .contentType(APPLICATION_JSON)
+                .auth().oauth2(accessToken)
+                .body("""
+                        {
+                            "allowedSourceTypes": [ "HttpData" ],
+                            "allowedTransferTypes": [ "HttpData-PULL" ],
+                            "url": "http://dataplane.edc-v.svc.cluster.local:8083/api/control/v1/dataflows"
+                        }
+                        """)
+                .post("/cp/api/mgmt/v4alpha/dataplanes/%s".formatted(participantContextId))
+                .then()
+                .log().ifValidationFails()
+                .statusCode(204);
     }
 
     private String createAsset(String participantContextId, String accessToken) {
