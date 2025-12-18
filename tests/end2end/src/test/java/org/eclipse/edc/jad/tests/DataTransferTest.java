@@ -14,21 +14,21 @@
 
 package org.eclipse.edc.jad.tests;
 
-import org.eclipse.edc.identityhub.spi.participantcontext.model.CreateParticipantContextResponse;
 import org.eclipse.edc.jad.tests.model.CatalogResponse;
+import org.eclipse.edc.jad.tests.model.ClientCredentials;
 import org.eclipse.edc.junit.annotations.EndToEndTest;
 import org.eclipse.edc.spi.monitor.ConsoleMonitor;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.util.Base64;
-import java.util.UUID;
+import java.time.Instant;
 
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.eclipse.edc.jad.tests.KeycloakApi.createKeycloakAdminToken;
+import static org.eclipse.edc.jad.tests.Constants.APPLICATION_JSON;
+import static org.eclipse.edc.jad.tests.Constants.BASE_URL;
+import static org.eclipse.edc.jad.tests.Constants.TM_BASE_URL;
 import static org.eclipse.edc.jad.tests.KeycloakApi.createKeycloakToken;
-import static org.eclipse.edc.jad.tests.KeycloakApi.createKeycloakUser;
 import static org.eclipse.edc.jad.tests.KeycloakApi.getAccessToken;
 import static org.eclipse.edc.jsonld.spi.JsonLdKeywords.ID;
 
@@ -41,10 +41,8 @@ import static org.eclipse.edc.jsonld.spi.JsonLdKeywords.ID;
 @EndToEndTest
 public class DataTransferTest {
 
-    public static final String ISSUER_CLIENT_ID = "issuer";
-    public static final String ISSUER_CLIENT_SECRET = "issuer-secret";
 
-    static final String BASE_URL = "http://127.0.0.1";
+    private static final String VAULT_TOKEN = "root";
 
     static String loadResourceFile(String resourceName) {
         try (var is = Thread.currentThread().getContextClassLoader().getResourceAsStream(resourceName)) {
@@ -60,57 +58,37 @@ public class DataTransferTest {
     @Test
     void testDataTransfer() {
         var monitor = new ConsoleMonitor(ConsoleMonitor.Level.DEBUG, true);
-        var kcAdminToken = createKeycloakAdminToken();
 
-        //create issuer user in KC
-        monitor.withPrefix("Issuer").info("Creating issuer user in Keycloak");
-        createKeycloakUser(ISSUER_CLIENT_ID, ISSUER_CLIENT_ID, ISSUER_CLIENT_SECRET, "participant", kcAdminToken);
 
-        var provisionerToken = createKeycloakToken("provisioner", "provisioner-secret", "issuer-admin-api:write", "identity-api:write", "management-api:write", "identity-api:read");
-        createIssuerTenant(provisionerToken);
-        createCelExpression(provisionerToken);
-        var participantIdBase64 = Base64.getEncoder().encodeToString(ISSUER_CLIENT_ID.getBytes());
-        monitor.withPrefix("Issuer").info("Creating attestation and credential definitions");
+        var adminToken = createKeycloakToken("admin", "edc-v-admin-secret", "issuer-admin-api:write", "identity-api:write", "management-api:write", "identity-api:read");
+        createCelExpression(adminToken);
 
-        var tenantToken = createKeycloakToken(ISSUER_CLIENT_ID, ISSUER_CLIENT_SECRET, "issuer-admin-api:write", "identity-api:write");
-        var attestationDefId = createAttestationDefinition(participantIdBase64, tenantToken);
-        var credentialDefId = createCredentialDefId(attestationDefId, participantIdBase64, tenantToken);
+        monitor.info("Create cell and dataspace profile");
+        var cellId = createCell();
+        var dataspaceProfileId = createDataspaceProfile();
 
         // onboard consumer
         monitor.info("Onboarding consumer");
-        var po = new ParticipantOnboarding("consumer", "did:web:identityhub.edc-v.svc.cluster.local%3A7083:consumer", ISSUER_CLIENT_ID, provisionerToken, monitor.withPrefix("Consumer"));
-        po.execute(credentialDefId);
+        var po = new ParticipantOnboarding("consumer", "did:web:identityhub.edc-v.svc.cluster.local%3A7083:consumer", VAULT_TOKEN, monitor.withPrefix("Consumer"));
+        var consumerCredentials = po.execute(cellId, dataspaceProfileId);
 
         // onboard provider
         monitor.info("Onboarding provider");
-        var providerPo = new ParticipantOnboarding("provider", "did:web:identityhub.edc-v.svc.cluster.local%3A7083:provider", ISSUER_CLIENT_ID, provisionerToken, monitor.withPrefix("Provider"));
-        providerPo.execute(credentialDefId);
+        var providerPo = new ParticipantOnboarding("provider", "did:web:identityhub.edc-v.svc.cluster.local%3A7083:provider", VAULT_TOKEN, monitor.withPrefix("Provider"));
+        var providerCredentials = providerPo.execute(cellId, dataspaceProfileId);
 
         // seed provider
         monitor.info("Seeding provider");
-        var providerAccesstoken = getAccessToken("provider", "provider-secret", "management-api:write");
+        var providerAccessToken = getAccessToken(providerCredentials.clientId(), providerCredentials.clientSecret(), "management-api:write").accessToken();
 
-        var assetId = createAsset(providerAccesstoken.accessToken());
-        var policyDefId = createPolicyDef(providerAccesstoken.accessToken());
-        createContractDef(providerAccesstoken.accessToken(), policyDefId, assetId);
+        var assetId = createAsset(providerCredentials.clientId(), providerAccessToken);
+        var policyDefId = createPolicyDef(providerCredentials.clientId(), providerAccessToken);
+        createContractDef(providerCredentials.clientId(), providerAccessToken, policyDefId, assetId);
+        registerDataplane(providerCredentials.clientId(), providerAccessToken);
 
         // perform data transfer
         monitor.info("Starting data transfer");
-        var accessToken = getAccessToken("consumer", "consumer-secret", "management-api:read");
-        var catalog = given()
-                .baseUri(BASE_URL)
-                .auth().oauth2(accessToken.accessToken())
-                .contentType("application/json")
-                .body("""
-                        {
-                          "counterPartyDid": "did:web:identityhub.edc-v.svc.cluster.local%3A7083:provider"
-                        }
-                        """)
-                .post("/cp/api/mgmt/v1alpha/participants/consumer/catalog")
-                .then()
-                .statusCode(200)
-                .extract().body()
-                .as(CatalogResponse.class);
+        var catalog = fetchCatalog(consumerCredentials);
 
         monitor.info("Catalog received, starting data transfer");
         var offerId = catalog.datasets().get(0).offers().get(0).id();
@@ -119,7 +97,7 @@ public class DataTransferTest {
         //download dummy data
         var jsonResponse = given()
                 .baseUri(BASE_URL)
-                .auth().oauth2(getAccessToken("consumer", "consumer-secret", "management-api:write").accessToken())
+                .auth().oauth2(getAccessToken(consumerCredentials.clientId(), consumerCredentials.clientSecret(), "management-api:write").accessToken())
                 .body("""
                         {
                             "providerId":"did:web:identityhub.edc-v.svc.cluster.local%%3A7083:provider",
@@ -127,69 +105,83 @@ public class DataTransferTest {
                         }
                         """.formatted(offerId))
                 .contentType("application/json")
-                .post("/cp/api/mgmt/v1alpha/participants/consumer/data")
+                .post("/cp/api/mgmt/v1alpha/participants/%s/data".formatted(consumerCredentials.clientId()))
                 .then()
                 .statusCode(200)
                 .extract().body().asPrettyString();
         assertThat(jsonResponse).isNotNull();
     }
 
-    private String createCredentialDefId(String attestationDefId, String participantIdBase64, String accessToken) {
-        var template = loadResourceFile("membership_def.json");
-
-        var id = UUID.randomUUID().toString();
-        template = template.replace("{{attestation_id}}", attestationDefId);
-        template = template.replace("{{id}}", id);
-
+    private void registerDataplane(String participantContextId, String accessToken) {
         given()
                 .baseUri(BASE_URL)
+                .contentType(APPLICATION_JSON)
                 .auth().oauth2(accessToken)
-                .contentType("application/json")
-                .body(template)
-                .post("/issuer/admin/api/admin/v1alpha/participants/%s/credentialdefinitions".formatted(participantIdBase64))
+                .body("""
+                        {
+                            "allowedSourceTypes": [ "HttpData" ],
+                            "allowedTransferTypes": [ "HttpData-PULL" ],
+                            "url": "http://dataplane.edc-v.svc.cluster.local:8083/api/control/v1/dataflows"
+                        }
+                        """)
+                .post("/cp/api/mgmt/v4alpha/dataplanes/%s".formatted(participantContextId))
                 .then()
                 .log().ifValidationFails()
-                .statusCode(201);
-        return id;
+                .statusCode(204);
     }
 
-    private String createAttestationDefinition(String participantIdBase64, String accessToken) {
-        var id = UUID.randomUUID().toString();
-        var body = """
-                {
-                  "attestationType": "membership",
-                  "configuration": {},
-                  "id": "%s"
-                }
-                """.formatted(id);
-        given()
-                .baseUri(BASE_URL)
-                .auth().oauth2(accessToken)
-                .contentType("application/json")
-                .body(body)
-                .post("/issuer/admin/api/admin/v1alpha/participants/%s/attestations".formatted(participantIdBase64))
-                .then()
-                .log().ifValidationFails()
-                .statusCode(201);
-        return id;
-    }
-
-    private CreateParticipantContextResponse createIssuerTenant(String accessToken) {
-        var template = loadResourceFile("create_participant_issuerservice.json");
-
-        template = template.replace("{{issuer_clientId}}", ISSUER_CLIENT_ID);
-        template = template.replace("{{issuer_clientSecret}}", ISSUER_CLIENT_SECRET);
+    private CatalogResponse fetchCatalog(ClientCredentials consumerCredentials) {
+        var accessToken = getAccessToken(consumerCredentials.clientId(), consumerCredentials.clientSecret(), "management-api:read");
 
         return given()
                 .baseUri(BASE_URL)
-                .auth().oauth2(accessToken)
+                .auth().oauth2(accessToken.accessToken())
                 .contentType("application/json")
-                .body(template)
-                .post("/issuer/cs/api/identity/v1alpha/participants")
+                .body("""
+                        {
+                          "counterPartyDid": "did:web:identityhub.edc-v.svc.cluster.local%3A7083:provider"
+                        }
+                        """)
+                .post("/cp/api/mgmt/v1alpha/participants/%s/catalog".formatted(consumerCredentials.clientId()))
                 .then()
                 .statusCode(200)
-                .extract()
-                .body().as(CreateParticipantContextResponse.class);
+                .extract().body()
+                .as(CatalogResponse.class);
+    }
+
+    private String createDataspaceProfile() {
+        return given()
+                .baseUri(TM_BASE_URL)
+                .contentType(APPLICATION_JSON)
+                .body("""
+                        {
+                            "artifacts": [],
+                            "properties": {}
+                        }
+                        """)
+                .post("/api/v1alpha1/dataspace-profiles")
+                .then()
+                .statusCode(201)
+                .log().ifValidationFails()
+                .extract().body().jsonPath().getString("id");
+    }
+
+    private String createCell() {
+        return given()
+                .contentType(APPLICATION_JSON)
+                .body("""
+                        {
+                            "properties": {
+                                "cellPurpose": "e2e-test"
+                            },
+                            "state": "active",
+                            "stateTimestamp": "%s"
+                        }
+                        """.formatted(Instant.now().toString()))
+                .post(TM_BASE_URL + "/api/v1alpha1/cells")
+                .then()
+                .statusCode(201)
+                .extract().jsonPath().getString("id");
     }
 
     private void createCelExpression(String accessToken) {
@@ -205,33 +197,33 @@ public class DataTransferTest {
                 .statusCode(200);
     }
 
-    private String createAsset(String accessToken) {
+    private String createAsset(String participantContextId, String accessToken) {
         var template = loadResourceFile("asset.json");
         return given()
                 .baseUri(BASE_URL)
                 .auth().oauth2(accessToken)
                 .contentType("application/json")
                 .body(template)
-                .post("/cp/api/mgmt/v4alpha/participants/provider/assets")
+                .post("/cp/api/mgmt/v4alpha/participants/%s/assets".formatted(participantContextId))
                 .then()
                 .statusCode(200)
                 .extract().jsonPath().getString(ID);
     }
 
-    private String createPolicyDef(String accessToken) {
+    private String createPolicyDef(String participantContextId, String accessToken) {
         var template = loadResourceFile("policy-def.json");
         return given()
                 .baseUri(BASE_URL)
                 .auth().oauth2(accessToken)
                 .contentType("application/json")
                 .body(template)
-                .post("/cp/api/mgmt/v4alpha/participants/provider/policydefinitions")
+                .post("/cp/api/mgmt/v4alpha/participants/%s/policydefinitions".formatted(participantContextId))
                 .then()
                 .statusCode(200)
                 .extract().jsonPath().getString(ID);
     }
 
-    private String createContractDef(String accessToken, String policyDefId, String assetId) {
+    private String createContractDef(String participantContextId, String accessToken, String policyDefId, String assetId) {
         var template = loadResourceFile("contract-def.json");
 
         template = template.replace("{{policy_def_id}}", policyDefId);
@@ -242,7 +234,7 @@ public class DataTransferTest {
                 .auth().oauth2(accessToken)
                 .contentType("application/json")
                 .body(template)
-                .post("/cp/api/mgmt/v4alpha/participants/provider/contractdefinitions")
+                .post("/cp/api/mgmt/v4alpha/participants/%s/contractdefinitions".formatted(participantContextId))
                 .then()
                 .statusCode(200)
                 .extract().jsonPath().getString(ID);

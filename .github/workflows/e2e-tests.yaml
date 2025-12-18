@@ -38,7 +38,6 @@ concurrency:
 jobs:
   E2E-Tests:
     runs-on: ubuntu-latest
-    if: 1 ==2 # disable for now
     steps:
       - uses: actions/checkout@v6
       - uses: eclipse-edc/.github/.github/actions/setup-build@main
@@ -88,12 +87,16 @@ jobs:
       - name: "Deploy JAD applications"
         run: |-
           # this is crucial - without it, KinD would take the prebuilt images from GHCR
-          grep -rlZ "imagePullPolicy:.*Always" . | xargs --null sed -i "s/imagePullPolicy:.*Always/imagePullPolicy: Never/g"
+          sed -i "s/imagePullPolicy:.*Always/imagePullPolicy: Never/g" k8s/apps/controlplane.yaml
+          sed -i "s/imagePullPolicy:.*Always/imagePullPolicy: Never/g" k8s/apps/dataplane.yaml
+          sed -i "s/imagePullPolicy:.*Always/imagePullPolicy: Never/g" k8s/apps/issuerservice.yaml
+          sed -i "s/imagePullPolicy:.*Always/imagePullPolicy: Never/g" k8s/apps/identityhub.yaml
           
           kubectl apply -f k8s/apps
+          
+          # wait until all init jobs are done
           kubectl wait --namespace edc-v \
-            --for=condition=ready pod \
-            --selector=type=edcv-app \
+            --for=condition=complete job --all \
             --timeout=90s
 
       - name: "Run E2E Test"

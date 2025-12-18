@@ -12,12 +12,13 @@
  *
  */
 
-package org.eclipse.edc.jad.tests.model;
+package org.eclipse.edc.jad.tests;
 
-import org.eclipse.edc.identityhub.spi.credential.request.model.RequestedCredential;
-
-import java.util.List;
-
-public record HolderCredentialRequestDto(String issuerDid, String holderPid, String issuerPid, String status,
-                                         List<RequestedCredential> typesAndFormats) {
+public interface Constants {
+    String APPLICATION_JSON = "application/json";
+    String TM_BASE_URL = "http://tm.localhost";
+    String PM_BASE_URL = "http://pm.localhost";
+    String VAULT_URL = "http://vault.localhost";
+    String BASE_URL = "http://127.0.0.1";
+    String KEYCLOAK_URL = "http://keycloak.localhost";
 }

@@ -14,5 +14,5 @@
 
 package org.eclipse.edc.jad.tests.model;
 
-public class CredentialListResponse {
+public record ClientCredentials(String clientId, String clientSecret) {
 }

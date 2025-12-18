@@ -17,12 +17,12 @@ package org.eclipse.edc.jad.tests;
 import org.eclipse.edc.jad.tests.model.AccessToken;
 
 import static io.restassured.RestAssured.given;
+import static org.eclipse.edc.jad.tests.Constants.KEYCLOAK_URL;
 import static org.eclipse.edc.jad.tests.DataTransferTest.loadResourceFile;
 import static org.hamcrest.Matchers.anyOf;
 import static org.hamcrest.Matchers.equalTo;
 
 public class KeycloakApi {
-    static final String KEYCLOAK_URL = "http://keycloak.localhost";
     private static final String KEYCLOAK_ADMIN_USER = "admin";
     private static final String KEYCLOAK_ADMIN_PASSWORD = "admin";
 

@@ -14,157 +14,174 @@
 
 package org.eclipse.edc.jad.tests;
 
-import org.eclipse.edc.identityhub.spi.participantcontext.model.CreateParticipantContextResponse;
-import org.eclipse.edc.jad.tests.model.HolderCredentialRequestDto;
+import io.restassured.specification.RequestSpecification;
+import org.eclipse.edc.jad.tests.model.ClientCredentials;
+import org.eclipse.edc.jad.tests.model.Orchestration;
 import org.eclipse.edc.spi.monitor.Monitor;
 
 import java.util.Base64;
-import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static io.restassured.RestAssured.given;
 import static java.util.concurrent.TimeUnit.SECONDS;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
-import static org.eclipse.edc.jad.tests.DataTransferTest.BASE_URL;
-import static org.eclipse.edc.jad.tests.DataTransferTest.loadResourceFile;
-import static org.eclipse.edc.jad.tests.KeycloakApi.createKeycloakAdminToken;
-import static org.eclipse.edc.jad.tests.KeycloakApi.createKeycloakUser;
-import static org.eclipse.edc.jad.tests.KeycloakApi.getAccessToken;
+import static org.eclipse.edc.jad.tests.Constants.BASE_URL;
+import static org.eclipse.edc.jad.tests.KeycloakApi.createKeycloakToken;
 
-public record ParticipantOnboarding(String participantContextId, String participantContextDid, String issuerId,
-                                    String accessToken, Monitor monitor) {
+public record ParticipantOnboarding(String participantName, String participantContextDid,
+                                    String vaultToken, Monitor monitor) {
 
-    public String participantContextIdBase64() {
-        return Base64.getEncoder().encodeToString(participantContextId.getBytes());
+    public ClientCredentials execute(String cellId, String dataspaceProfileId) {
+
+        monitor.info("Creating tenant for %s".formatted(participantName));
+        var tenantId = createTenant(participantName);
+        monitor.info("Deploy dataspace profile");
+        deployDataspaceProfile(dataspaceProfileId, cellId);
+        monitor.info("Deploy participant profile");
+        var profileId = deployParticipantProfile(tenantId, cellId, participantContextDid);
+
+        monitor.info("Waiting for orchestration to complete");
+        var orchestrationId = queryOrchestrationByProfileId(profileId);
+        var orchestration = getOrchestrationById(orchestrationId);
+        monitor.info("Orchestration completed. Reading participant access credentials");
+        var participantContextId = orchestration.getOutputData().get("participantContextId").toString();
+        var secret = getVaultSecret(participantContextId);
+
+        var token = createKeycloakToken(participantContextId, secret, "identity-api:write", "identity-api:read");
+
+        monitor.info("Waiting for credential issuance");
+        assertThat(orchestration.getOutputData())
+                .hasFieldOrProperty("holderPid")
+                .hasFieldOrProperty("participantContextId")
+                .hasFieldOrProperty("credentialRequest");
+
+        var holderPid = orchestration.getOutputData().get("holderPid");
+        assertThat(holderPid).withFailMessage(() -> "holderPid should be on the Orchestration's output data").isNotNull();
+        waitForCredentialIssuance(participantContextId, token, holderPid.toString());
+
+
+        return new ClientCredentials(participantContextId, secret);
     }
 
-    public void execute(String credentialDefinitionId) {
-        var accessToken = createKeycloakAdminToken();
-        monitor.info("Configuring Vault Access in Keycloak");
-        createKeycloakUser(participantContextId + "-vault", participantContextId, participantContextId + "-secret", "participant", accessToken);
-        monitor.info("Configuring API Access in Keycloak");
-        createKeycloakUser(participantContextId, participantContextId, participantContextId + "-secret", "participant", accessToken);
-
-        monitor.info("Create holder in IssuerService");
-        createHolder();
-
-        monitor.info("Onboard onto IdentityHub");
-        var ihPc = createParticipantInIdentityHub();
-        monitor.info("Onboard onto Control Plane");
-        createParticipantInControlPlane(ihPc);
-
-        monitor.info("Create credential request");
-        var userToken = KeycloakApi.createKeycloakToken(participantContextId, participantContextId + "-secret", "identity-api:write", "identity-api:read");
-        var holderPid = createCredentialRequest(userToken, credentialDefinitionId);
-
-        monitor.info("Wait for credential issuance");
-        waitForCredentialIssuance(userToken, holderPid);
-        monitor.info("Credential issued successfully");
+    //we could the full HashicorpVault for this, but a REST request is simpler here
+    private String getVaultSecret(String participantContextId) {
+        return given()
+                .baseUri(Constants.VAULT_URL)
+                .header("X-Vault-Token", vaultToken)
+                .get("/v1/secret/data/%s".formatted(participantContextId))
+                .then()
+                .log().ifValidationFails()
+                .statusCode(200)
+                .extract().body().jsonPath().getString("data.data.content");
     }
 
-    private void waitForCredentialIssuance(String userToken, String holderPid) {
+    private Orchestration getOrchestrationById(String orchestrationId) {
+        return pmRequest()
+                .get("/api/v1alpha1/orchestrations/%s".formatted(orchestrationId))
+                .then()
+                .log().ifValidationFails()
+                .statusCode(200)
+                .extract().body().as(Orchestration.class);
+    }
+
+    private String queryOrchestrationByProfileId(String profileId) {
+        var orchestrationId = new AtomicReference<String>();
+        await().atMost(20, SECONDS)
+                .pollInterval(1, SECONDS).untilAsserted(() -> {
+                    var body = pmRequest()
+                            .body("""
+                                    {
+                                         "predicate": "correlationId = '%s'"
+                                    }
+                                    """.formatted(profileId))
+                            .post("/api/v1alpha1/orchestrations/query")
+                            .then()
+                            .log().ifValidationFails()
+                            .statusCode(200)
+                            .extract().body();
+                    orchestrationId.set(body.jsonPath().getString("[0].id"));
+
+                });
+        return orchestrationId.get();
+    }
+
+
+    private String deployParticipantProfile(String tenantId, String cellId, String participantContextDid) {
+        return tmRequest()
+                .body("""
+                        {
+                            "identifier": "%s",
+                            "properties": {},
+                            "cellId": "%s"
+                        }
+                        """.formatted(participantContextDid, cellId))
+                .post("/api/v1alpha1/tenants/%s/participant-profiles".formatted(tenantId))
+                .then()
+                .log().ifValidationFails()
+                .statusCode(202)
+                .extract().body().jsonPath().getString("id");
+    }
+
+    private void deployDataspaceProfile(String dataspaceProfileId, String cellId) {
+        tmRequest()
+                .body("""
+                        {
+                            "profileId": "%s",
+                            "cellId": "%s"
+                        }
+                        """.formatted(dataspaceProfileId, cellId))
+                .post("/api/v1alpha1/dataspace-profiles/%s/deployments".formatted(dataspaceProfileId))
+                .then()
+                .log().ifValidationFails()
+                .statusCode(202);
+    }
+
+    private String createTenant(String participantContextId) {
+        return tmRequest()
+                .body("""
+                        {
+                            "properties": {
+                                "name": "%s tenant",
+                                "location": "eu"
+                            }
+                        }
+                        """.formatted(participantContextId))
+                .post("/api/v1alpha1/tenants")
+                .then()
+                .log().ifValidationFails()
+                .statusCode(201)
+                .extract().body().jsonPath().getString("id");
+    }
+
+
+    private RequestSpecification tmRequest() {
+        return given()
+                .baseUri(Constants.TM_BASE_URL)
+                .contentType(Constants.APPLICATION_JSON);
+    }
+
+    private RequestSpecification pmRequest() {
+        return given()
+                .baseUri(Constants.PM_BASE_URL)
+                .contentType(Constants.APPLICATION_JSON);
+    }
+
+    private void waitForCredentialIssuance(String participantContextId, String userToken, String holderPid) {
         await().atMost(20, SECONDS)
                 .pollInterval(1, SECONDS).until(() -> {
+                    var pcB64 = Base64.getUrlEncoder().encodeToString(participantContextId.getBytes());
                     var response = given()
                             .baseUri(BASE_URL)
                             .contentType("application/json")
                             .auth().oauth2(userToken)
-                            .get("/cs/api/identity/v1alpha/participants/%s/credentials/request/%s".formatted(participantContextIdBase64(), holderPid))
+                            .get("/cs/api/identity/v1alpha/participants/%s/credentials/request/%s".formatted(pcB64, holderPid))
                             .then()
                             .log().ifValidationFails()
                             .statusCode(200)
                             .extract()
-                            .body()
-                            .as(HolderCredentialRequestDto.class);
-                    return "ISSUED".equals(response.status());
+                            .body().jsonPath().getString("status");
+                    return "ISSUED".equals(response);
                 });
-    }
-
-    private String createCredentialRequest(String userToken, String credentialDefinitionId) {
-        var holderPid = UUID.randomUUID().toString();
-        given()
-                .baseUri(BASE_URL)
-                .contentType("application/json")
-                .auth().oauth2(userToken)
-                .body("""
-                        {
-                            "issuerDid": "did:web:issuerservice.edc-v.svc.cluster.local%%3A10016:issuer",
-                            "holderPid": "%s",
-                            "credentials": [{
-                                "format": "VC1_0_JWT",
-                                "type": "MembershipCredential",
-                                "id": "%s"
-                            }]
-                        }
-                        """.formatted(holderPid, credentialDefinitionId))
-                .post("/cs/api/identity/v1alpha/participants/%s/credentials/request".formatted(participantContextIdBase64()))
-                .then()
-                .log().ifValidationFails()
-                .statusCode(201);
-        return holderPid;
-    }
-
-    /**
-     * Onboards the participant in the control plane.
-     *
-     * @deprecated will be replaced by the proper Management API call in due time
-     */
-    @Deprecated
-    private void createParticipantInControlPlane(CreateParticipantContextResponse identityhubClient) {
-        var template = loadResourceFile("create_participant_controlplane.json");
-        var requestBody = template.replace("{{participant_context_id}}", participantContextId)
-                .replace("{{participant_context_did}}", participantContextDid)
-                .replace("{{tenant_clientSecret}}", identityhubClient.clientSecret())
-                .replace("{{tenant_clientId}}", identityhubClient.clientId());
-
-        var accessToken = getAccessToken("admin", "edc-v-admin-secret", "management-api:read management-api:write identity-api:read identity-api:write").accessToken();
-        given()
-                .baseUri(BASE_URL)
-                .contentType("application/json")
-                .auth().oauth2(accessToken)
-                .body(requestBody)
-                .post("/cp/api/mgmt/v1alpha/participants")
-                .then()
-                .log().ifValidationFails()
-                .statusCode(201);
-    }
-
-    private CreateParticipantContextResponse createParticipantInIdentityHub() {
-        var template = loadResourceFile("create_participant_identityhub.json");
-        var requestBody = template
-                .replace("{{participant_context_id}}", participantContextId)
-                .replace("{{participant_context_did}}", participantContextDid)
-                .replace("{{participant_context_id_base64}}", participantContextIdBase64());
-
-        return given()
-                .baseUri(BASE_URL)
-                .contentType("application/json")
-                .auth().oauth2(accessToken)
-                .body(requestBody)
-                .post("/cs/api/identity/v1alpha/participants")
-                .then()
-                .log().ifValidationFails()
-                .statusCode(200)
-                .extract()
-                .body().as(CreateParticipantContextResponse.class);
-    }
-
-    private void createHolder() {
-        given()
-                .baseUri(BASE_URL)
-                .contentType("application/json")
-                .auth().oauth2(accessToken)
-                .body("""
-                        {
-                             "did": "%s",
-                             "holderId": "%s",
-                             "name": "%s tenant"
-                         }""".formatted(participantContextDid, participantContextDid, participantContextId))
-                .post("/issuer/admin/api/admin/v1alpha/participants/%s/holders".formatted(issuerIdBase64()))
-                .then()
-                .statusCode(201);
-    }
-
-    private String issuerIdBase64() {
-        return Base64.getEncoder().encodeToString(issuerId.getBytes());
     }
 }

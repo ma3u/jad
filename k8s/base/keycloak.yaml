@@ -270,6 +270,7 @@ data:
       "groups": [],
       "eventsEnabled": false
     }
+
 ---
 apiVersion: v1
 kind: Service
