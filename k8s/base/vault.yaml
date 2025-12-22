@@ -166,6 +166,15 @@ spec:
                 "clock_skew_leeway": 60
               }
               EOF
+              
+              vault write secret/data/aes-key-alias -<<EOF || { echo "Failed to create ase key entry"; exit 1; }
+              {
+                "data": {
+                  "content": "yHo9w6m2KOI3FE7vI+fcN6j86JDQ6V10lJPlv9lLWoE="
+                }
+              }
+              EOF
+              
               echo "Vault bootstrap completed successfully!"
       restartPolicy: OnFailure
 

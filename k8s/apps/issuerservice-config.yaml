@@ -49,6 +49,7 @@ data:
   edc.sql.schema.autocreate: "true"
   edc.iam.accesstoken.jti.validation: "true"
 
+  edc.encryption.aes.key.alias: "aes-key-alias"
   # Oauth2 config
   # KeyCloak takes the `iss` claim's host from the request URL. For now, this is the URL defined in the ingress route.
   # to do this properly, we should probably configure the following properties on the ingress route:
@@ -64,5 +65,3 @@ data:
   edc.datasource.membership.url: "jdbc:postgresql://postgres.edc-v.svc.cluster.local:5432/issuerservice"
   edc.datasource.membership.user: "issuer"
   edc.datasource.membership.password: "issuer"
-
-  edc.encryption.strict: "false"
