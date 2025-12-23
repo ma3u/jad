@@ -153,7 +153,7 @@ kubectl wait --namespace edc-v \
             --selector=type=edcv-infra \
             --timeout=90s
 
-kubectl apply -k k8s/apps/
+kubectl apply -f k8s/apps/
 
 # Wait for seed jobs to be ready:
 kubectl wait --namespace edc-v \
