@@ -27,6 +27,7 @@ pluginManagement {
 rootProject.name = "jad"
 include(":extensions:api:mgmt")
 include(":extensions:data-plane-public-api-v2")
+include(":extensions:data-plane-certs")
 include(":tests:end2end")
 
 // launcher modules

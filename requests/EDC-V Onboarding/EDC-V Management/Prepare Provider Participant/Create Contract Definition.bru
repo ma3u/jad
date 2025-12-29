@@ -1,7 +1,7 @@
 meta {
   name: Create Contract Definition
   type: http
-  seq: 8
+  seq: 3
 }
 
 post {
@@ -22,9 +22,9 @@ body:json {
     "assetsSelector": [
       {
         "@type": "Criterion",
-        "operandLeft": "https://w3id.org/edc/v0.0.1/ns/id",
+        "operandLeft": "privateProperties.'https://w3id.org/edc/v0.0.1/ns/permission'",
         "operator" : "=",
-        "operandRight" : "{{ASSET_ID}}"
+        "operandRight" : "{{ASSET_PERMISSION}}"
       }
     ]
   }

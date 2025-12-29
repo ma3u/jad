@@ -267,11 +267,20 @@ to select the
 
 ## Transfer Data
 
+Now that both participants are set up, we can transfer data from the Provider to the Consumer.
+There are two use case supported here:
+
+- Http proxy
+- Certificates sharing via HTTP
+
+### Http proxy
+
 EDC-V offers a one-stop-shop API to transfer data. This is achieved by two endpoints, one that fetches the catalog (
-`Data Transfer/Get Catalog`) and another endpoint (`Data Transfer/Get Data`) that initiates the contract negotiation,
+`Data Transfer/Http Todo/Get Catalog`) and another endpoint (`Data Transfer/Http Todo/Get Data`) that initiates the
+contract negotiation,
 waits for its successful completion, then starts the data transfer.
 
-Perform the entire sequence by running both requests in the `Data Transfer` folder in Bruno:
+Perform the entire sequence by running both requests in the `Data Transfer/Http Todo` folder in Bruno:
 
 ![img.png](docs/images/bruno_transfer.png)
 
@@ -296,6 +305,30 @@ from https://jsonplaceholder.typicode.com/todos, something like:
   //...
 ]
 ```
+
+### Certificates sharing via HTTP
+
+The second use case demonstrates how certificates can be shared between participants using EDC-V's HTTP data
+transfer capabilities.
+
+First we need to upload a certificate to the Provider. This is done by running the
+`Data Transfer/Http Certs/Provider/Upload Certificate` request in Bruno:
+
+![img.png](docs/images/bruno_upload_certificate.png)
+
+by selecting a file to upload (e.g. a `.pdf` file). Additional metadata can be provided in the request body using
+the `metadata` field.
+
+Then perform the entire sequence by running both requests in the `Data Transfer/Http Certs/Consumer` folder in Bruno:
+
+![img.png](docs/images/bruno_certificate_consumer.png)
+
+which:
+
+- Fetches the catalog from the Provider storing the offer id for the certificate asset
+- Setup the transfer request using the offer id (contract negotiation + transfer initiation) storing the access token
+- Query the provider for listing the available certificates storing the first certificate id
+- Finally, download the certificate using the certificate id
 
 ## Automated tests
 

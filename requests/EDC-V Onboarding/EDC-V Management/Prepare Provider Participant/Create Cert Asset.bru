@@ -1,0 +1,36 @@
+meta {
+  name: Create Cert Asset
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseURL}}/cp/api/mgmt/v4alpha/participants/{{provider_id}}/assets
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "@context": [
+      "https://w3id.org/edc/connector/management/v2"
+    ],
+    "@type": "Asset",
+    "@id": "{{ASSET_CERT_ID}}",
+    "properties": {
+      "description": "This asset requires the Membership credential to access"
+    },
+    "privateProperties": {
+      "permission": "{{ASSET_PERMISSION}}"
+    },
+    "dataAddress": {
+      "@type": "DataAddress",
+      "type": "HttpCertData"
+    }
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

@@ -46,6 +46,8 @@ spec:
               name: debug-port
             - containerPort: 8083
               name: control-port
+            - containerPort: 8186
+              name: certs-port
             - containerPort: 8080
               name: health-port
           livenessProbe:
@@ -87,6 +89,9 @@ spec:
     - name: control
       port: 8083
       targetPort: 8083
+    - name: certs
+      port: 8186
+      targetPort: 8186
     - name: public
       port: 11002
       targetPort: 11002
@@ -112,3 +117,46 @@ spec:
                 name: dataplane
                 port:
                   number: 11002
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-dataplane-control
+  namespace: edc-v
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: "/$2"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /app/internal(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: dataplane
+                port:
+                  number: 8083
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-dataplane-certs-control
+  namespace: edc-v
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: "/$2"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /app/public(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: dataplane
+                port:
+                  number: 8186

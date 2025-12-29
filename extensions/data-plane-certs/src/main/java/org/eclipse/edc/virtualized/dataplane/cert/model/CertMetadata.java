@@ -12,16 +12,10 @@
  *
  */
 
-package org.eclipse.edc.jad.tests.model;
+package org.eclipse.edc.virtualized.dataplane.cert.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.Map;
 
-import java.util.List;
-
-@JsonIgnoreProperties(ignoreUnknown = true)
-public record DataSet(@JsonProperty("@id") String id, @JsonProperty("hasPolicy") List<Offer> offers) {
+public record CertMetadata(String id, String contentType, Map<String, Object> properties) {
 
 }
-
-

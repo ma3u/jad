@@ -21,8 +21,10 @@ script:post-response {
       const json = res.getBody();
   
       // Navigate the expected structure: Catalog -> dataset[0] -> hasPolicy[0] -> @id
+      const assetId = "todo_asset";
       const datasets = json.dataset || [];
-      const firstDataset = datasets[0] || {};
+      const firstDataset = datasets.filter(dataset => dataset["@id"] === assetId)[0] || {};
+    
       const policies = firstDataset.hasPolicy || [];
       const firstPolicy = policies[0] || {};
       const policyId = firstPolicy['@id'];

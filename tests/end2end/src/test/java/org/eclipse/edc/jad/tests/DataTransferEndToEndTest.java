@@ -27,6 +27,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.Map;
 
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -49,6 +51,11 @@ public class DataTransferEndToEndTest {
 
     private static final String VAULT_TOKEN = "root";
 
+    private static final ConsoleMonitor MONITOR = new ConsoleMonitor(ConsoleMonitor.Level.DEBUG, true);
+    private static ClientCredentials providerCredentials;
+    private static ClientCredentials consumerCredentials;
+
+
     static String loadResourceFile(String resourceName) {
         try (var is = Thread.currentThread().getContextClassLoader().getResourceAsStream(resourceName)) {
             if (is == null) {
@@ -70,31 +77,61 @@ public class DataTransferEndToEndTest {
                     return om;
                 }
         ));
-    }
-
-    @Test
-    void testDataTransfer() {
-        var monitor = new ConsoleMonitor(ConsoleMonitor.Level.DEBUG, true);
-
 
         var adminToken = createKeycloakToken("admin", "edc-v-admin-secret", "issuer-admin-api:write", "identity-api:write", "management-api:write", "identity-api:read");
         createCelExpression(adminToken);
 
-        monitor.info("Create cell and dataspace profile");
+        MONITOR.info("Create cell and dataspace profile");
         var cellId = getCellId();
 
         // onboard consumer
-        monitor.info("Onboarding consumer");
-        var po = new ParticipantOnboarding("consumer", "did:web:identityhub.edc-v.svc.cluster.local%3A7083:consumer", VAULT_TOKEN, monitor.withPrefix("Consumer"));
-        var consumerCredentials = po.execute(cellId);
+        MONITOR.info("Onboarding consumer");
+        var po = new ParticipantOnboarding("consumer", "did:web:identityhub.edc-v.svc.cluster.local%3A7083:consumer", VAULT_TOKEN, MONITOR.withPrefix("Consumer"));
+        consumerCredentials = po.execute(cellId);
 
         // onboard provider
-        monitor.info("Onboarding provider");
-        var providerPo = new ParticipantOnboarding("provider", "did:web:identityhub.edc-v.svc.cluster.local%3A7083:provider", VAULT_TOKEN, monitor.withPrefix("Provider"));
-        var providerCredentials = providerPo.execute(cellId);
+        MONITOR.info("Onboarding provider");
+        var providerPo = new ParticipantOnboarding("provider", "did:web:identityhub.edc-v.svc.cluster.local%3A7083:provider", VAULT_TOKEN, MONITOR.withPrefix("Provider"));
+        providerCredentials = providerPo.execute(cellId);
+    }
+
+    /**
+     * Creates a Common Expression Language (CEL) entry in the control plane
+     *
+     * @param accessToken OAuth2 token
+     */
+    private static void createCelExpression(String accessToken) {
+        var template = loadResourceFile("create_cel_expression.json");
+
+        given()
+                .baseUri(BASE_URL)
+                .auth().oauth2(accessToken)
+                .contentType("application/json")
+                .body(template)
+                .post("/cp/api/mgmt/v4alpha/celexpressions")
+                .then()
+                .statusCode(200);
+    }
+
+    /**
+     * Creates a cell in CFM.
+     *
+     * @return the Cell ID
+     */
+    private static String getCellId() {
+        return given()
+                .contentType(APPLICATION_JSON)
+                .get(TM_BASE_URL + "/api/v1alpha1/cells")
+                .then()
+                .statusCode(200)
+                .extract().jsonPath().getString("[0].id");
+    }
+
+    @Test
+    void testTodoDataTransfer() {
 
         // seed provider
-        monitor.info("Seeding provider");
+        MONITOR.info("Seeding provider");
         var providerAccessToken = getAccessToken(providerCredentials.clientId(), providerCredentials.clientSecret(), "management-api:write").accessToken();
 
         var assetId = createAsset(providerCredentials.clientId(), providerAccessToken);
@@ -103,11 +140,11 @@ public class DataTransferEndToEndTest {
         registerDataplane(providerCredentials.clientId(), providerAccessToken);
 
         // perform data transfer
-        monitor.info("Starting data transfer");
+        MONITOR.info("Starting data transfer");
         var catalog = fetchCatalog(consumerCredentials);
 
-        monitor.info("Catalog received, starting data transfer");
-        var offerId = catalog.datasets().get(0).offers().get(0).id();
+        MONITOR.info("Catalog received, starting data transfer");
+        var offerId = catalog.datasets().stream().filter(dataSet -> dataSet.id().equals(assetId)).findFirst().get().offers().get(0).id();
         assertThat(offerId).isNotNull();
 
         //download dummy data
@@ -128,6 +165,56 @@ public class DataTransferEndToEndTest {
         assertThat(jsonResponse).isNotNull();
     }
 
+    @Test
+    void testCertDataTransfer() {
+
+        // seed provider
+        MONITOR.info("Seeding provider");
+        var providerAccessToken = getAccessToken(providerCredentials.clientId(), providerCredentials.clientSecret(), "management-api:write").accessToken();
+
+        var assetId = createCertAsset(providerCredentials.clientId(), providerAccessToken);
+        var policyDefId = createPolicyDef(providerCredentials.clientId(), providerAccessToken);
+        createContractDef(providerCredentials.clientId(), providerAccessToken, policyDefId, assetId);
+        registerDataplane(providerCredentials.clientId(), providerAccessToken);
+
+        // perform data transfer
+        MONITOR.info("Starting data transfer");
+        var catalog = fetchCatalog(consumerCredentials);
+
+        MONITOR.info("Catalog received, starting data transfer");
+        var offerId = catalog.datasets().stream().filter(dataSet -> dataSet.id().equals(assetId)).findFirst().get().offers().get(0).id();
+        assertThat(offerId).isNotNull();
+
+        // trigger transfer
+        var transferResponse = given()
+                .baseUri(BASE_URL)
+                .auth().oauth2(getAccessToken(consumerCredentials.clientId(), consumerCredentials.clientSecret(), "management-api:write").accessToken())
+                .body("""
+                        {
+                            "providerId":"did:web:identityhub.edc-v.svc.cluster.local%%3A7083:provider",
+                            "policyId": "%s"
+                        }
+                        """.formatted(offerId))
+                .contentType("application/json")
+                .post("/cp/api/mgmt/v1alpha/participants/%s/transfer".formatted(consumerCredentials.clientId()))
+                .then()
+                .statusCode(200)
+                .extract().body().as(Map.class);
+
+        var accessToken = transferResponse.get("https://w3id.org/edc/v0.0.1/ns/authorization");
+
+        var list = given()
+                .baseUri(BASE_URL)
+                .header("Authorization", accessToken)
+                .body("{}")
+                .contentType("application/json")
+                .post("app/public/api/data/certs/request")
+                .then()
+                .statusCode(200)
+                .extract().body().as(List.class);
+
+        assertThat(list).isEmpty();
+    }
 
     private CatalogResponse fetchCatalog(ClientCredentials consumerCredentials) {
         var accessToken = getAccessToken(consumerCredentials.clientId(), consumerCredentials.clientSecret(), "management-api:read");
@@ -148,56 +235,6 @@ public class DataTransferEndToEndTest {
                 .as(CatalogResponse.class);
     }
 
-    private String createDataspaceProfile() {
-        return given()
-                .baseUri(TM_BASE_URL)
-                .contentType(APPLICATION_JSON)
-                .body("""
-                        {
-                            "artifacts": [],
-                            "properties": {}
-                        }
-                        """)
-                .post("/api/v1alpha1/dataspace-profiles")
-                .then()
-                .statusCode(201)
-                .log().ifValidationFails()
-                .extract().body().jsonPath().getString("id");
-    }
-
-    /**
-     * Creates a cell in CFM.
-     *
-     * @return the Cell ID
-     */
-    private String getCellId() {
-        return given()
-                .contentType(APPLICATION_JSON)
-                .get(TM_BASE_URL + "/api/v1alpha1/cells")
-                .then()
-                .statusCode(200)
-                .extract().jsonPath().getString("[0].id");
-    }
-
-
-    /**
-     * Creates a Common Expression Language (CEL) entry in the control plane
-     *
-     * @param accessToken OAuth2 token
-     */
-    private void createCelExpression(String accessToken) {
-        var template = loadResourceFile("create_cel_expression.json");
-
-        given()
-                .baseUri(BASE_URL)
-                .auth().oauth2(accessToken)
-                .contentType("application/json")
-                .body(template)
-                .post("/cp/api/mgmt/v4alpha/celexpressions")
-                .then()
-                .statusCode(200);
-    }
-
     /**
      * Registers a data plane for a new participant context. This is a bit of a workaround, until Dataplane Signaling is fully implemented.
      * Check also the {@code DataplaneRegistrationApiController} in the {@code extensions/api/mgmt} directory
@@ -212,7 +249,7 @@ public class DataTransferEndToEndTest {
                 .auth().oauth2(accessToken)
                 .body("""
                         {
-                            "allowedSourceTypes": [ "HttpData" ],
+                            "allowedSourceTypes": [ "HttpData", "HttpCertData" ],
                             "allowedTransferTypes": [ "HttpData-PULL" ],
                             "url": "http://dataplane.edc-v.svc.cluster.local:8083/api/control/v1/dataflows"
                         }
@@ -225,6 +262,19 @@ public class DataTransferEndToEndTest {
 
     private String createAsset(String participantContextId, String accessToken) {
         var template = loadResourceFile("asset.json");
+        return given()
+                .baseUri(BASE_URL)
+                .auth().oauth2(accessToken)
+                .contentType("application/json")
+                .body(template)
+                .post("/cp/api/mgmt/v4alpha/participants/%s/assets".formatted(participantContextId))
+                .then()
+                .statusCode(200)
+                .extract().jsonPath().getString(ID);
+    }
+
+    private String createCertAsset(String participantContextId, String accessToken) {
+        var template = loadResourceFile("asset-cert.json");
         return given()
                 .baseUri(BASE_URL)
                 .auth().oauth2(accessToken)

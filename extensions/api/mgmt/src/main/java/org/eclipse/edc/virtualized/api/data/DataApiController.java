@@ -117,6 +117,32 @@ public class DataApiController {
 
     }
 
+    @POST
+    @Path("/transfer")
+    public void setupTransfer(@PathParam("participantContextId") String participantContextId, DataRequest dataRequest, @Suspended AsyncResponse response) {
+        var participantContext = participantContextService.getParticipantContext(participantContextId);
+        if (participantContext.failed()) {
+            response.resume(Response.status(404).entity("Participant context '%s' not found".formatted(participantContextId)).build());
+        }
+        dataRequestService.setupTransfer(participantContext.getContent(), dataRequest)
+                .whenComplete((result, throwable) -> {
+                    try {
+                        if (throwable != null) {
+                            response.resume(Response.status(500).entity(throwable.getMessage()).build());
+
+                        } else if (result.succeeded()) {
+                            response.resume(result.getContent());
+                        } else {
+                            response.resume(Response.status(500).entity(result.getFailureDetail()).build());
+                        }
+                    } catch (Throwable mapped) {
+                        response.resume(Response.status(500).entity(mapped.getMessage()).build());
+                    }
+                });
+
+
+    }
+
     private <T> T toResponse(StatusResult<T> result, Throwable throwable) throws Throwable {
         if (throwable == null) {
             if (result.succeeded()) {

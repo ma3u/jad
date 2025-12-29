@@ -38,6 +38,7 @@ import org.eclipse.edc.virtualized.api.data.DataRequest;
 import java.net.URI;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 import static java.net.http.HttpClient.newHttpClient;
@@ -68,6 +69,16 @@ public class DataRequestService {
                 .thenCompose(this::waitForTransferProcess)
                 .thenCompose(transferProcess -> getEdr(transferProcess.getId()))
                 .thenCompose(this::downloadData)
+                .thenApply(ServiceResult::success);
+    }
+
+    public CompletableFuture<ServiceResult<Map<String, Object>>> setupTransfer(ParticipantContext participantContext, DataRequest dataRequest) {
+        return initiateContractNegotiation(participantContext, dataRequest)
+                .thenCompose(this::waitForContractNegotiation)
+                .thenCompose(contractNegotiation -> startTransferProcess(participantContext, contractNegotiation))
+                .thenCompose(this::waitForTransferProcess)
+                .thenCompose(transferProcess -> getEdr(transferProcess.getId()))
+                .thenCompose(edr -> CompletableFuture.completedFuture(edr.getProperties()))
                 .thenApply(ServiceResult::success);
     }
 
