@@ -100,35 +100,56 @@ spec:
 
 
 ---
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
 metadata:
-  name: issuerservice
+  name: issuerservice-admin
   namespace: edc-v
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: "/$2"
-    nginx.ingress.kubernetes.io/use-regex: "true"
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
 spec:
-  ingressClassName: nginx
+  parentRefs:
+    - name: edcv-gateway
+  hostnames:
+    - issuer.localhost
   rules:
-    - http:
-        paths:
-          - path: /issuer/cs(/|$)(.*)
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: issuerservice
-                port:
-                  number: 10015
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /admin
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /
+      backendRefs:
+        - name: issuerservice
+          port: 10013
 
-          - path: /issuer/admin(/|$)(.*)
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: issuerservice
-                port:
-                  number: 10013
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: issuerservice-credentialservice
+  namespace: edc-v
+spec:
+  parentRefs:
+    - name: edcv-gateway
+  hostnames:
+    - issuer.localhost
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /cs
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /
+      backendRefs:
+        - name: issuerservice
+          port: 10015
 
 ---
 apiVersion: networking.k8s.io/v1

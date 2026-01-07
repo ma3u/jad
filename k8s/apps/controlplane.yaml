@@ -93,23 +93,21 @@ spec:
       targetPort: 1044
 
 ---
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
 metadata:
   name: controlplane
   namespace: edc-v
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: "/$2"
-    nginx.ingress.kubernetes.io/use-regex: "true"
 spec:
-  ingressClassName: nginx
+  parentRefs:
+    - name: edcv-gateway
+  hostnames:
+    - cp.localhost
   rules:
-    - http:
-        paths:
-          - path: /cp(/|$)(.*)
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: controlplane
-                port:
-                  number: 8081
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: controlplane
+          port: 8081

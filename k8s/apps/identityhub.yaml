@@ -101,45 +101,47 @@ spec:
       name: sts
 
 ---
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
 metadata:
   name: identityhub
   namespace: edc-v
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: "/$2"
-    nginx.ingress.kubernetes.io/use-regex: "true"
 spec:
-  ingressClassName: nginx
+  parentRefs:
+    - name: edcv-gateway
+  hostnames:
+    - ih.localhost
   rules:
-    - http:
-        paths:
-          - path: /cs(/|$)(.*)
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: identityhub
-                port:
-                  number: 7081
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /cs
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /
+      backendRefs:
+        - name: identityhub
+          port: 7081
 
 ---
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
 metadata:
   name: identityhub-did
   namespace: edc-v
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: "/$2"
-
 spec:
-  ingressClassName: nginx
+  parentRefs:
+    - name: edcv-gateway
+  hostnames:
+    - ih.localhost
   rules:
-    - http:
-        paths:
-          - path: /(/|&)(.*)
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: identityhub
-                port:
-                  number: 7083
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: identityhub
+          port: 7083

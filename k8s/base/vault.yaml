@@ -193,20 +193,21 @@ spec:
       targetPort: 8200
 
 ---
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
 metadata:
   name: vault
   namespace: edc-v
 spec:
+  parentRefs:
+    - name: edcv-gateway
+  hostnames:
+    - vault.localhost
   rules:
-    - host: vault.localhost
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: vault
-                port:
-                  number: 8200
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: vault
+          port: 8200

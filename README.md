@@ -25,6 +25,7 @@ Such a dataspace requires – at a minimum – the following components:
 - Java 17+
 - Docker
 - `kubectl`
+- Helm (for Traefik installation)
 - macOS or Linux as an operating system. **Windows is not natively supported**!
 - a POSIX-compliant shell (e.g., bash, zsh)
 - [Bruno](https://www.usebruno.com) (or similar). The API requests here are optimized for Bruno, but other tools work as
@@ -41,19 +42,83 @@ To create a KinD cluster, run:
 
 ```shell
 cp ~/.kube/config ~/.kube/config.bak # to save your existing kubeconfig
-kind create cluster -n edcv --config kind.config.yaml --kubeconfig ~/.kube/edcv-kind.conf
+kind create cluster -n edcv --kubeconfig ~/.kube/edcv-kind.conf
 ln -sf ~/.kube/edcv-kind.conf ~/.kube/config # to use KinD's kubeconfig
 ```
 
-Next, deploy the NGINX ingress controller:
+Next, we need to deploy a Gateway controller to allow access to services from outside the cluster. There are several
+popular choices, and we've opted for [Traefik](https://doc.traefik.io/traefik/setup/kubernetes/) in this case. We could
+have gone for Envoy, but Traefik is easier to set up and lighter-weight.
 
 ```shell
-kubectl apply -f https://kind.sigs.k8s.io/examples/ingress/deploy-ingress-nginx.yaml
-kubectl wait --namespace ingress-nginx \
-  --for=condition=ready pod \
-  --selector=app.kubernetes.io/component=controller \
-  --timeout=90s
+helm repo add traefik https://traefik.github.io/charts
+helm repo update
+helm upgrade --install --namespace traefik traefik traefik/traefik --create-namespace -f values.yaml
 ```
+
+Note that Traefik installs all the required Kubernetes CRDs automatically, so we do not have to install them manually.
+
+#### Enable network access to services
+
+With the Gateway API, there are three main ways to access services from outside the cluster:
+
+- using port-forwarding: this is a manual way to forward ports from the host to the cluster. This is not
+  recommended for production use but works fine for local testing. We will use this approach here for simplicity.
+
+- via a LoadBalancer service: this is typically used in cloud-hosted Kubernetes clusters, where the cloud provider
+  provisions a load balancer automatically. This is the recommended approach for production use when running in
+  cloud-hosted environments, and DNS names are used. For KinD, there is no built-in load balancer, but one can be
+  installed
+
+
+- via `NodePort` services: this exposes services on high-numbered ports on the host machine. This is not
+  recommended for production use, and it gets complicated quickly when multiple services are involved, as is the case
+  here. _This is not shown here_.
+
+##### Option 1 (recommended): via port-forwarding
+
+To set up port-forwarding, run the following command:
+
+```shell
+kubectl -n traefik port-forward svc/traefik 80
+```
+
+This forwards port 80 from the host to the Traefik service inside the cluster. You may need to run this with `sudo`
+privileges on some systems.
+
+##### Option 2: via LoadBalancer (alternative)
+
+The KinD project provides
+a [cloud-like load balancer implementation](https://github.com/kubernetes-sigs/cloud-provider-kind). It emulates an
+external LB as you would get on cloud-hosted K8s clusters.
+Install it according to the instructions in the repository.
+
+Verify, that the `EXTERNAL-IP` of the `traefik` service is not yet assigned:
+
+```shell
+kubectl get svc -n traefik
+NAME      TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)                      AGE
+traefik   LoadBalancer   10.96.251.221   <pending>     80:31415/TCP,443:31650/TCP   22s
+```
+
+To assign an IP address to the Traefik LoadBalancer service, we need to run the external LB:
+
+```shell
+cloud-provider-kind 
+# on macOS:
+sudo cloud-provider-kind
+```
+
+Now, if we rerun the previous command, we should see a similar output to this:
+
+```shell
+kubectl get svc -n traefik
+NAME      TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)                      AGE
+traefik   LoadBalancer   10.96.251.221   172.18.0.3    80:31415/TCP,443:31650/TCP   2m31s
+```
+
+> Note that with the external LB, services inside the cluster must be accessed via the external IP address, e.g.
+`172.18.0.3` in this case. Variables inside the Bruno collection must be adjusted accordingly!
 
 ### 2. Deploy applications
 
@@ -435,3 +500,4 @@ livenessProbe:
   successThreshold: 1
   failureThreshold: 15 # changed
 ```
+

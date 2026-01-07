@@ -97,66 +97,62 @@ spec:
       targetPort: 11002
 
 ---
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
 metadata:
-  name: ingress-dataplane
+  name: httproute-dataplane
   namespace: edc-v
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: "/$2"
-    nginx.ingress.kubernetes.io/use-regex: "true"
 spec:
-  ingressClassName: nginx
+  parentRefs:
+    - name: edcv-gateway
+      namespace: edc-v
+  hostnames:
+    - dp.localhost
   rules:
-    - http:
-        paths:
-          - path: /dp/public(/|$)(.*)
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: dataplane
-                port:
-                  number: 11002
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: ingress-dataplane-control
-  namespace: edc-v
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: "/$2"
-    nginx.ingress.kubernetes.io/use-regex: "true"
-spec:
-  ingressClassName: nginx
-  rules:
-    - http:
-        paths:
-          - path: /app/internal(/|$)(.*)
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: dataplane
-                port:
-                  number: 8083
+    # /dp/public → public port 11002
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /public
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /
+      backendRefs:
+        - name: dataplane
+          port: 11002
+          weight: 1
 
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: ingress-dataplane-certs-control
-  namespace: edc-v
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: "/$2"
-    nginx.ingress.kubernetes.io/use-regex: "true"
-spec:
-  ingressClassName: nginx
-  rules:
-    - http:
-        paths:
-          - path: /app/public(/|$)(.*)
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: dataplane
-                port:
-                  number: 8186
+    # /app/internal → control port 8083
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /app/internal
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /
+      backendRefs:
+        - name: dataplane
+          port: 8083
+          weight: 1
+
+    # /app/public → certs port 8186
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /app/public
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /
+      backendRefs:
+        - name: dataplane
+          port: 8186
+          weight: 1
