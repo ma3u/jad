@@ -55,7 +55,6 @@ jobs:
       - name: "Create k8s Kind Cluster"
         uses: helm/kind-action@v1.13.0
         with:
-          config: kind.config.yaml
           cluster_name: jad
 
       - name: "Load runtime images into KinD"
