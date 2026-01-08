@@ -56,7 +56,11 @@ helm repo update
 helm upgrade --install --namespace traefik traefik traefik/traefik --create-namespace -f values.yaml
 ```
 
-Note that Traefik installs all the required Kubernetes CRDs automatically, so we do not have to install them manually.
+Then, install the custom resource definitions (CRDs) for the Gateway API:
+
+```shell
+kubectl apply --server-side --force-conflicts -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.1/experimental-install.yaml
+```
 
 #### Enable network access to services
 

@@ -81,13 +81,13 @@ spec:
                 -d '{
                   "artifacts": [],
                   "properties": {},
-                  "dataspaceSpec" : {
-                    "protocolStack": [],
-                    "credentialSpecs": [{
-                      "type": "MembershipCredential",
-                      "format": "VC1_0_JWT",
-                      "id": "membership-credential-def",
-                      "issuer": "did:web:issuerservice.edc-v.svc.cluster.local%3A10016:issuer"
+                  "dataspaceSpec": {
+                     "protocolStack": ["dsp-2025-1", "dcp-2025-1"],
+                     "credentialSpecs": [{
+                        "type": "MembershipCredential",
+                        "issuer": "did:web:issuerservice.edc-v.svc.cluster.local%3A10016:issuer",
+                        "format": "VC1_0_JWT",
+                        "id": "membership-credential-def"
                     }]
                   }
                 }')

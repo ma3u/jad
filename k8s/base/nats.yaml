@@ -90,7 +90,7 @@ metadata:
   name: nats
   namespace: edc-v
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
     app: nats
   ports:

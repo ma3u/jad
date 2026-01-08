@@ -303,16 +303,6 @@ spec:
         - path:
             type: PathPrefix
             value: /
-      filters:
-        - type: RequestHeaderModifier
-          requestHeaderModifier:
-            set:
-              - name: Host
-                value: keycloak.localhost
-              - name: X-Forwarded-Host
-                value: keycloak.localhost
-              - name: X-Forwarded-Proto
-                value: http
       backendRefs:
         - name: keycloak
           port: 8080

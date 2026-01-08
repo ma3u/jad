@@ -79,7 +79,7 @@ metadata:
   name: dataplane
   namespace: edc-v
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
     app: dataplane
   ports:

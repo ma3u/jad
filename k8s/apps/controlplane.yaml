@@ -75,7 +75,7 @@ metadata:
   name: controlplane
   namespace: edc-v
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
     app: controlplane
   ports:
@@ -101,6 +101,8 @@ metadata:
 spec:
   parentRefs:
     - name: edcv-gateway
+      kind: Gateway
+      sectionName: http
   hostnames:
     - cp.localhost
   rules:
@@ -111,3 +113,4 @@ spec:
       backendRefs:
         - name: controlplane
           port: 8081
+          weight: 1
