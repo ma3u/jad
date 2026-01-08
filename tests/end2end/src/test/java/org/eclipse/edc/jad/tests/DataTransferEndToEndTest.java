@@ -33,7 +33,8 @@ import java.util.Map;
 import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.eclipse.edc.jad.tests.Constants.APPLICATION_JSON;
-import static org.eclipse.edc.jad.tests.Constants.BASE_URL;
+import static org.eclipse.edc.jad.tests.Constants.CONTROLPLANE_BASE_URL;
+import static org.eclipse.edc.jad.tests.Constants.DATAPLANE_BASE_URL;
 import static org.eclipse.edc.jad.tests.Constants.TM_BASE_URL;
 import static org.eclipse.edc.jad.tests.KeycloakApi.createKeycloakToken;
 import static org.eclipse.edc.jad.tests.KeycloakApi.getAccessToken;
@@ -104,11 +105,11 @@ public class DataTransferEndToEndTest {
         var template = loadResourceFile("create_cel_expression.json");
 
         given()
-                .baseUri(BASE_URL)
+                .baseUri(CONTROLPLANE_BASE_URL)
                 .auth().oauth2(accessToken)
                 .contentType("application/json")
                 .body(template)
-                .post("/cp/api/mgmt/v4alpha/celexpressions")
+                .post("/api/mgmt/v4alpha/celexpressions")
                 .then()
                 .statusCode(200);
     }
@@ -149,7 +150,7 @@ public class DataTransferEndToEndTest {
 
         //download dummy data
         var jsonResponse = given()
-                .baseUri(BASE_URL)
+                .baseUri(CONTROLPLANE_BASE_URL)
                 .auth().oauth2(getAccessToken(consumerCredentials.clientId(), consumerCredentials.clientSecret(), "management-api:write").accessToken())
                 .body("""
                         {
@@ -158,7 +159,7 @@ public class DataTransferEndToEndTest {
                         }
                         """.formatted(offerId))
                 .contentType("application/json")
-                .post("/cp/api/mgmt/v1alpha/participants/%s/data".formatted(consumerCredentials.clientId()))
+                .post("/api/mgmt/v1alpha/participants/%s/data".formatted(consumerCredentials.clientId()))
                 .then()
                 .statusCode(200)
                 .extract().body().asPrettyString();
@@ -187,7 +188,7 @@ public class DataTransferEndToEndTest {
 
         // trigger transfer
         var transferResponse = given()
-                .baseUri(BASE_URL)
+                .baseUri(CONTROLPLANE_BASE_URL)
                 .auth().oauth2(getAccessToken(consumerCredentials.clientId(), consumerCredentials.clientSecret(), "management-api:write").accessToken())
                 .body("""
                         {
@@ -196,7 +197,7 @@ public class DataTransferEndToEndTest {
                         }
                         """.formatted(offerId))
                 .contentType("application/json")
-                .post("/cp/api/mgmt/v1alpha/participants/%s/transfer".formatted(consumerCredentials.clientId()))
+                .post("/api/mgmt/v1alpha/participants/%s/transfer".formatted(consumerCredentials.clientId()))
                 .then()
                 .statusCode(200)
                 .extract().body().as(Map.class);
@@ -204,11 +205,11 @@ public class DataTransferEndToEndTest {
         var accessToken = transferResponse.get("https://w3id.org/edc/v0.0.1/ns/authorization");
 
         var list = given()
-                .baseUri(BASE_URL)
+                .baseUri(DATAPLANE_BASE_URL)
                 .header("Authorization", accessToken)
                 .body("{}")
                 .contentType("application/json")
-                .post("app/public/api/data/certs/request")
+                .post("/app/public/api/data/certs/request")
                 .then()
                 .statusCode(200)
                 .extract().body().as(List.class);
@@ -220,7 +221,7 @@ public class DataTransferEndToEndTest {
         var accessToken = getAccessToken(consumerCredentials.clientId(), consumerCredentials.clientSecret(), "management-api:read");
 
         return given()
-                .baseUri(BASE_URL)
+                .baseUri(CONTROLPLANE_BASE_URL)
                 .auth().oauth2(accessToken.accessToken())
                 .contentType("application/json")
                 .body("""
@@ -228,7 +229,7 @@ public class DataTransferEndToEndTest {
                           "counterPartyDid": "did:web:identityhub.edc-v.svc.cluster.local%3A7083:provider"
                         }
                         """)
-                .post("/cp/api/mgmt/v1alpha/participants/%s/catalog".formatted(consumerCredentials.clientId()))
+                .post("/api/mgmt/v1alpha/participants/%s/catalog".formatted(consumerCredentials.clientId()))
                 .then()
                 .statusCode(200)
                 .extract().body()
@@ -244,7 +245,7 @@ public class DataTransferEndToEndTest {
      */
     private void registerDataplane(String participantContextId, String accessToken) {
         given()
-                .baseUri(BASE_URL)
+                .baseUri(CONTROLPLANE_BASE_URL)
                 .contentType(APPLICATION_JSON)
                 .auth().oauth2(accessToken)
                 .body("""
@@ -254,7 +255,7 @@ public class DataTransferEndToEndTest {
                             "url": "http://dataplane.edc-v.svc.cluster.local:8083/api/control/v1/dataflows"
                         }
                         """)
-                .post("/cp/api/mgmt/v4alpha/dataplanes/%s".formatted(participantContextId))
+                .post("/api/mgmt/v4alpha/dataplanes/%s".formatted(participantContextId))
                 .then()
                 .log().ifValidationFails()
                 .statusCode(204);
@@ -263,11 +264,11 @@ public class DataTransferEndToEndTest {
     private String createAsset(String participantContextId, String accessToken) {
         var template = loadResourceFile("asset.json");
         return given()
-                .baseUri(BASE_URL)
+                .baseUri(CONTROLPLANE_BASE_URL)
                 .auth().oauth2(accessToken)
                 .contentType("application/json")
                 .body(template)
-                .post("/cp/api/mgmt/v4alpha/participants/%s/assets".formatted(participantContextId))
+                .post("/api/mgmt/v4alpha/participants/%s/assets".formatted(participantContextId))
                 .then()
                 .statusCode(200)
                 .extract().jsonPath().getString(ID);
@@ -276,11 +277,11 @@ public class DataTransferEndToEndTest {
     private String createCertAsset(String participantContextId, String accessToken) {
         var template = loadResourceFile("asset-cert.json");
         return given()
-                .baseUri(BASE_URL)
+                .baseUri(CONTROLPLANE_BASE_URL)
                 .auth().oauth2(accessToken)
                 .contentType("application/json")
                 .body(template)
-                .post("/cp/api/mgmt/v4alpha/participants/%s/assets".formatted(participantContextId))
+                .post("/api/mgmt/v4alpha/participants/%s/assets".formatted(participantContextId))
                 .then()
                 .statusCode(200)
                 .extract().jsonPath().getString(ID);
@@ -289,11 +290,11 @@ public class DataTransferEndToEndTest {
     private String createPolicyDef(String participantContextId, String accessToken) {
         var template = loadResourceFile("policy-def.json");
         return given()
-                .baseUri(BASE_URL)
+                .baseUri(CONTROLPLANE_BASE_URL)
                 .auth().oauth2(accessToken)
                 .contentType("application/json")
                 .body(template)
-                .post("/cp/api/mgmt/v4alpha/participants/%s/policydefinitions".formatted(participantContextId))
+                .post("/api/mgmt/v4alpha/participants/%s/policydefinitions".formatted(participantContextId))
                 .then()
                 .statusCode(200)
                 .extract().jsonPath().getString(ID);
@@ -306,11 +307,11 @@ public class DataTransferEndToEndTest {
         template = template.replace("{{asset_id}}", assetId);
 
         return given()
-                .baseUri(BASE_URL)
+                .baseUri(CONTROLPLANE_BASE_URL)
                 .auth().oauth2(accessToken)
                 .contentType("application/json")
                 .body(template)
-                .post("/cp/api/mgmt/v4alpha/participants/%s/contractdefinitions".formatted(participantContextId))
+                .post("/api/mgmt/v4alpha/participants/%s/contractdefinitions".formatted(participantContextId))
                 .then()
                 .statusCode(200)
                 .extract().jsonPath().getString(ID);

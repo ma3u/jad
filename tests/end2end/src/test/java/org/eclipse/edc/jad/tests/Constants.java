@@ -15,10 +15,15 @@
 package org.eclipse.edc.jad.tests;
 
 public interface Constants {
+
+    // make sure that all the following URLs are valid. This is done by port-forwarding the Gateway API Controller (Traefik) port (80) to localhost:8080
+
     String APPLICATION_JSON = "application/json";
-    String TM_BASE_URL = "http://tm.localhost";
-    String PM_BASE_URL = "http://pm.localhost";
-    String VAULT_URL = "http://vault.localhost";
-    String BASE_URL = "http://127.0.0.1";
-    String KEYCLOAK_URL = "http://keycloak.localhost";
+    String TM_BASE_URL = "http://tm.localhost:8080";
+    String PM_BASE_URL = "http://pm.localhost:8080";
+    String VAULT_URL = "http://vault.localhost:8080";
+    String CONTROLPLANE_BASE_URL = "http://cp.localhost:8080";
+    String DATAPLANE_BASE_URL = "http://dp.localhost:8080";
+    String IDENTITYHUB_BASE_URL = "http://ih.localhost:8080";
+    String KEYCLOAK_URL = "http://keycloak.localhost:8080";
 }

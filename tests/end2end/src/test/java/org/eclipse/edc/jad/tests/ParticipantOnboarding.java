@@ -26,8 +26,10 @@ import static io.restassured.RestAssured.given;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
-import static org.eclipse.edc.jad.tests.Constants.BASE_URL;
+import static org.eclipse.edc.jad.tests.Constants.IDENTITYHUB_BASE_URL;
 import static org.eclipse.edc.jad.tests.KeycloakApi.createKeycloakToken;
+import static org.hamcrest.Matchers.anyOf;
+import static org.hamcrest.Matchers.equalTo;
 
 /**
  * Takes care of onboarding a single participant into the test Dataspace
@@ -197,16 +199,18 @@ public record ParticipantOnboarding(String participantName, String participantCo
         await().atMost(20, SECONDS)
                 .pollInterval(1, SECONDS).until(() -> {
                     var pcB64 = Base64.getUrlEncoder().encodeToString(participantContextId.getBytes());
-                    var response = given()
-                            .baseUri(BASE_URL)
+                    var body = given()
+                            .baseUri(IDENTITYHUB_BASE_URL)
                             .contentType("application/json")
                             .auth().oauth2(userToken)
                             .get("/cs/api/identity/v1alpha/participants/%s/credentials/request/%s".formatted(pcB64, holderPid))
                             .then()
                             .log().ifValidationFails()
-                            .statusCode(200)
+                            .statusCode(anyOf(equalTo(200), equalTo(204)))
                             .extract()
-                            .body().jsonPath().getString("status");
+                            .body();
+                    var json = body.asPrettyString();
+                    var response = body.jsonPath().getString("status");
                     return "ISSUED".equals(response);
                 });
     }
