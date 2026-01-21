@@ -50,7 +50,6 @@ jobs:
       - name: "Build runtime images"
         run: |
           ./gradlew dockerize
-          docker buildx build -f launchers/postgres/Dockerfile -t ghcr.io/metaform/jad/postgres:wal2json launchers/postgres
 
       - name: "Create k8s Kind Cluster"
         uses: helm/kind-action@v1.13.0
@@ -59,8 +58,7 @@ jobs:
 
       - name: "Load runtime images into KinD"
         run: |
-          kind load docker-image -n jad ghcr.io/metaform/jad/postgres:wal2json \
-                                ghcr.io/metaform/jad/controlplane:latest \
+          kind load docker-image -n jad ghcr.io/metaform/jad/controlplane:latest \
                                 ghcr.io/metaform/jad/dataplane:latest \
                                 ghcr.io/metaform/jad/identity-hub:latest \
                                 ghcr.io/metaform/jad/issuerservice:latest 

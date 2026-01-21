@@ -23,7 +23,6 @@ dependencies {
     runtimeOnly(libs.edcv.bom.controlplane)
     runtimeOnly(libs.edcv.bom.controlplane.sql)
     runtimeOnly(libs.edcv.bom.controlplane.nats)
-    runtimeOnly(libs.edcv.bom.controlplane.nats.cdc)
     runtimeOnly(libs.edcv.bom.controlplane.dcp)
 
     runtimeOnly(libs.edc.core.edrstore)

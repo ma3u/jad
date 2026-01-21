@@ -43,10 +43,6 @@ data:
   edc.nats.tp.subscriber.url: "nats://nats.edc-v.svc.cluster.local:4222"
   edc.nats.tp.subscriber.autocreate: "true"
   edc.nats.tp.publisher.url: "nats://nats.edc-v.svc.cluster.local:4222"
-  edc.postgres.cdc.url: "jdbc:postgresql://postgres.edc-v.svc.cluster.local:5432/controlplane"
-  edc.postgres.cdc.user: "cp"
-  edc.postgres.cdc.password: "cp"
-  edc.postgres.cdc.slot: "edc_cdc_slot_controlplane"
 
   # dataplane config
   edc.datasource.default.url: "jdbc:postgresql://postgres.edc-v.svc.cluster.local:5432/controlplane"

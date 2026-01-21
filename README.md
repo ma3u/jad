@@ -147,17 +147,7 @@ and now want to see it in action, please follow the following steps to build and
   ./gradlew dockerize
   ```
 
-  This will build the Docker images for all components and store them in the local Docker registry. JAD requires a
-  special version of PostgreSQL, in particular, it installs the `wal2json` extension. You can create this special
-  Postgres
-  version by running
-
-  ```shell
-  docker buildx build -f launchers/postgres/Dockerfile --platform linux/amd64,linux/arm64 -t ghcr.io/metaform/jad/postgres:wal2json launchers/postgres
-  ```
-
-  this will create the image `postgres:wal2json` for both amd64 and arm64 (e.g., Apple Silicon) architectures. Add
-  platforms as needed.
+  This will build the Docker images for all components and store them in the local Docker registry.
 
 - load images into KinD: KinD has no access to the host's docker context, so we need to load the images into KinD. Note
   that other Kubernetes runtimes such as Minikube do things differently. Verify that all images are there by running
@@ -168,8 +158,7 @@ and now want to see it in action, please follow the following steps to build and
       ghcr.io/metaform/jad/controlplane:latest \
       ghcr.io/metaform/jad/identity-hub:latest \
       ghcr.io/metaform/jad/issuerservice:latest \
-      ghcr.io/metaform/jad/dataplane:latest \
-      ghcr.io/metaform/jad/postgres:wal2json -n edcv
+      ghcr.io/metaform/jad/dataplane:latest -n edcv
   ```
 
   or if you're a bash God:
