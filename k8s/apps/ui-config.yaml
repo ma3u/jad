@@ -21,7 +21,7 @@ data:
   config.json: |
     {
       "production": true,
-      "apiUrl": "http://redline.edc-v.svc.cluster.local:8081",
+      "apiUrl": "http://redline.localhost/api/ui",
       "appName": "Aruba's DataSpace",
       "version": "1.0.0",
       "features": {
@@ -50,7 +50,8 @@ data:
           },
           "bearerExcludedUrls": ["/assets"]
         }
-      }
+      },
+      "participantIdentifierPrefix": "did:web:identityhub.edc-v.svc.cluster.local%3A7083:"
     }
 
 
