@@ -1,6 +1,6 @@
-![logo](docs/images/logo.png)
-
 # JAD—Just Another Demonstrator
+
+![logo](docs/images/logo.png)
 
 JAD is a demonstrator that deploys a fully-fledged dataspace as a Software-as-a-Service (SaaS) solution in Kubernetes.
 This is to illustrate how Cloud Service Providers (CSPs) can deploy and manage dataspace components in their own cloud
@@ -177,9 +177,9 @@ and now want to see it in action, please follow the following steps to build and
   This builds all CFM components' docker images and loads them into your KinD cluster, assuming that your KinD cluster
   is named `"edcv"`. If not, set the cluster name for the make file accordingly:
 
-  ```
+  ```shell
   cd /path/to/cfm/
-  make load-into-kind KIND_CLUSTER_NAME=your_cluster_name`.
+  make load-into-kind KIND_CLUSTER_NAME=your_cluster_name
   ```
 
   Note that individual `make` targets for all CFM components exist, for example `make load-into-kind-pmanager`.
@@ -286,6 +286,30 @@ vault-bootstrap            Complete   1/1           19s        120m
 ```
 
 Those are needed to populate the databases and the vault with initial data.
+
+### 4.1 Quick verification on macOS (KinD)
+
+If you deployed JAD on a local KinD cluster, these commands provide a fast health check:
+
+```shell
+# ensure you're on the local KinD context
+kubectl config use-context kind-edcv
+
+# verify all core deployments are available
+kubectl get deployments -n edc-v
+
+# verify all seed jobs are complete
+kubectl get jobs -n edc-v
+
+# verify service routes are reachable through Traefik
+kubectl -n traefik port-forward svc/traefik 8080:80
+curl -H "Host: cp.localhost" http://127.0.0.1:8080/api/mgmt -I
+```
+
+Notes:
+
+- On macOS, forwarding Traefik to local port `80` may fail with permission errors; use `8080:80` instead.
+- A `401` response from `cp.localhost` is expected for unauthenticated requests and confirms routing is working.
 
 ### 5. Prepare the data space
 

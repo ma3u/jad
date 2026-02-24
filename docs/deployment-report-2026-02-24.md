@@ -8,6 +8,17 @@ This report documents the local deployment run on macOS, aligned to `README.md` 
 - Namespace: `edc-v`.
 - Deployment source: Kubernetes manifests in `k8s/base` and `k8s/apps`.
 
+## Execution progress
+
+1. Environment validation: ✅ completed (`docker`, `kubectl`, `helm`, `kind`, GitHub CLI auth).
+2. Cluster bootstrap: ✅ completed (`kind create cluster -n edcv`, context switched to `kind-edcv`).
+3. Gateway setup: ✅ completed (Traefik installed, Gateway API CRDs applied).
+4. Source build attempt: ⚠️ initially failed (`./gradlew dockerize` PKIX), then ✅ recovered and succeeded on rerun.
+5. Base deploy: ✅ completed (`k8s/base` applied; initial readiness timeout recovered on retry).
+6. App deploy: ✅ completed (`k8s/apps` applied).
+7. Seed jobs stabilization: ✅ completed after manifest fixes (`provision-manager-seed`, `redline-seed`).
+8. Final verification: ✅ completed (all deployments available, all seed jobs complete).
+
 ## README flow status
 
 ### 1) Create a KinD cluster
@@ -26,12 +37,11 @@ This report documents the local deployment run on macOS, aligned to `README.md` 
 
 ### 2) Deploy applications (image strategy)
 
-- README option 1 (pre-built images): effectively used.
-- README option 2 (`./gradlew dockerize`): attempted.
+- README option 1 (pre-built images): used for initial deployment recovery.
+- README option 2 (`./gradlew dockerize`): rerun after Gradle/toolchain fixes.
 - Command: `./gradlew dockerize`
-- Status: ❌ Failed
-- Failure reason: TLS/PKIX handshake error retrieving snapshot plugin metadata from Sonatype snapshot repository.
-- Result: Continued with pre-built images referenced by manifests.
+- Status: ✅ Success
+- Result: Docker images built locally for all launcher modules (`controlplane`, `dataplane`, `identity-hub`, `issuerservice`).
 
 ### 3) Deploy services
 
@@ -121,4 +131,4 @@ This report documents the local deployment run on macOS, aligned to `README.md` 
 ## Additional notes
 
 - Docker Desktop visibility: with KinD, workloads run inside the KinD node container (`edcv-control-plane`) and are best inspected via `kubectl`/Lens/K9s.
-- Existing unrelated local diffs were observed in Gradle files (`build.gradle.kts`, `settings.gradle.kts`) but were not required for the Kubernetes fix path used in this deployment.
+- `./gradlew dockerize` is currently healthy in this workspace (last run: `BUILD SUCCESSFUL`).
