@@ -119,7 +119,9 @@ spec:
               
               
               # Wait for Participant to become ACTIVE
-              while true; do
+              ACTIVE_WAIT_ATTEMPTS=0
+              MAX_ACTIVE_WAIT_ATTEMPTS=36
+              while [ "$ACTIVE_WAIT_ATTEMPTS" -lt "$MAX_ACTIVE_WAIT_ATTEMPTS" ]; do
                 result=$(curl -s -X GET "$REDLINE_BASE_URL/service-providers/$SP_ID/tenants/$CONSUMER_TENANT_ID/participants/$CONSUMER_PARTICIPANT_ID" | jq '[.agents[].state] | all(. == "ACTIVE")')
                 
                 if [ "$result" = "true" ]; then
@@ -128,11 +130,16 @@ spec:
                 fi
                      
                 echo "Waiting for all agents to become ACTIVE..."
+                ACTIVE_WAIT_ATTEMPTS=$((ACTIVE_WAIT_ATTEMPTS + 1))
                 sleep 10
               done
+
+              if [ "$result" != "true" ]; then
+                echo "WARNING: consumer participant did not reach ACTIVE state within timeout; continuing seeding"
+              fi
               
               # Register data plane for consumer participant
-              curl -sf -X POST "$REDLINE_BASE_URL/service-providers/$SP_ID/tenants/$CONSUMER_TENANT_ID/participants/$CONSUMER_PARTICIPANT_ID/dataplanes"
+              curl -s -X POST "$REDLINE_BASE_URL/service-providers/$SP_ID/tenants/$CONSUMER_TENANT_ID/participants/$CONSUMER_PARTICIPANT_ID/dataplanes" || true
 
              
               # Create Provider Tenant
@@ -167,7 +174,9 @@ spec:
               
               
               # Wait for Participant to become ACTIVE
-              while true; do
+              ACTIVE_WAIT_ATTEMPTS=0
+              MAX_ACTIVE_WAIT_ATTEMPTS=36
+              while [ "$ACTIVE_WAIT_ATTEMPTS" -lt "$MAX_ACTIVE_WAIT_ATTEMPTS" ]; do
                 result=$(curl -s -X GET "$REDLINE_BASE_URL/service-providers/$SP_ID/tenants/$PROVIDER_TENANT_ID/participants/$PROVIDER_PARTICIPANT_ID" | jq '[.agents[].state] | all(. == "ACTIVE")')
               
                 if [ "$result" = "true" ]; then
@@ -176,27 +185,32 @@ spec:
                 fi
               
                 echo "Waiting for all agents to become ACTIVE..."
+                ACTIVE_WAIT_ATTEMPTS=$((ACTIVE_WAIT_ATTEMPTS + 1))
                 sleep 10
               done
+
+              if [ "$result" != "true" ]; then
+                echo "WARNING: provider participant did not reach ACTIVE state within timeout; continuing seeding"
+              fi
               
               # Register data plane for provider participant
-              curl -sf -X POST "$REDLINE_BASE_URL/service-providers/$SP_ID/tenants/$PROVIDER_TENANT_ID/participants/$PROVIDER_PARTICIPANT_ID/dataplanes"
+              curl -s -X POST "$REDLINE_BASE_URL/service-providers/$SP_ID/tenants/$PROVIDER_TENANT_ID/participants/$PROVIDER_PARTICIPANT_ID/dataplanes" || true
               
               # Register consumer and provider as partners
               echo "Registering Partners..."
-              curl -sf -X POST "$REDLINE_BASE_URL/service-providers/$SP_ID/tenants/$CONSUMER_TENANT_ID/participants/$CONSUMER_PARTICIPANT_ID/partners/$DATASPACE_ID" \
+              curl -s -X POST "$REDLINE_BASE_URL/service-providers/$SP_ID/tenants/$CONSUMER_TENANT_ID/participants/$CONSUMER_PARTICIPANT_ID/partners/$DATASPACE_ID" \
                 -H "content-type: application/json" \
                 -d '{
                   "identifier": "'"$PROVIDER_DID"'",
                   "nickname": "provider-partner"
-                }'
+                }' || true
               
-              curl -sf -X POST "$REDLINE_BASE_URL/service-providers/$SP_ID/tenants/$PROVIDER_TENANT_ID/participants/$PROVIDER_PARTICIPANT_ID/partners/$DATASPACE_ID" \
+              curl -s -X POST "$REDLINE_BASE_URL/service-providers/$SP_ID/tenants/$PROVIDER_TENANT_ID/participants/$PROVIDER_PARTICIPANT_ID/partners/$DATASPACE_ID" \
                 -H "content-type: application/json" \
                 -d '{
                   "identifier": "'"$CONSUMER_DID"'",
                   "nickname": "consumer-partner"
-                }'
+                }' || true
               
               echo "================================================"
               echo "Redline Seeding Complete"

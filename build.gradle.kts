@@ -32,6 +32,12 @@ buildscript {
 val edcBuildId = libs.plugins.edc.build.get().pluginId
 val jadVersion: String by project
 
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+}
+
 allprojects {
     apply(plugin = edcBuildId)
     apply(plugin = "org.eclipse.edc.autodoc")
@@ -39,6 +45,15 @@ allprojects {
     // configure which version of the annotation processor to use. defaults to the same version as the plugin
     configure<org.eclipse.edc.plugins.autodoc.AutodocExtension> {
         outputDirectory.set(project.layout.buildDirectory.asFile)
+    }
+
+    // Apply Java 21 toolchain to all projects
+    plugins.withType<JavaPlugin> {
+        configure<JavaPluginExtension> {
+            toolchain {
+                languageVersion.set(JavaLanguageVersion.of(21))
+            }
+        }
     }
 }
 subprojects {

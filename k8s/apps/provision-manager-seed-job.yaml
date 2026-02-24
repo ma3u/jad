@@ -138,51 +138,47 @@ spec:
               echo "Step 6: Create Orchestration Definition (deploy)"
               echo "------------------------------------------------"
 
-              DEPLOY_ORCH_ID=$(cat /proc/sys/kernel/random/uuid)
-
               curl -sf -X POST "${PM_BASE_URL}/api/v1alpha1/orchestration-definitions" \
                 -H "Content-Type: application/json" \
                 -d '{
-                  "activities": [
-                    {
-                      "id": "kc-client-provisioner",
-                      "type": "keycloak-activity",
-                      "discriminator": "deploy",
-                      "dependsOn": []
-                    },
-                    {
-                      "id": "registration-agent",
-                      "type": "registration-activity",
-                      "discriminator": "deploy",
-                      "dependsOn": [
-                        "kc-client-provisioner"
-                      ]
-                    },
-                    {
-                      "id": "connector-provisioner",
-                      "type": "edcv-activity",
-                      "discriminator": "deploy",
-                      "dependsOn": [
-                        "kc-client-provisioner"
-                      ]
-                    },
-                    {
-                      "id": "onboarding-agent",
-                      "type": "onboarding-activity",
-                      "discriminator": "deploy",
-                      "dependsOn": [
-                        "connector-provisioner",
-                        "registration-agent"
-                      ]
-                    }
-                  ],
+                  "activities": {
+                    "cfm.orchestration.vpa.deploy": [
+                      {
+                        "id": "kc-client-provisioner",
+                        "type": "keycloak-activity",
+                        "dependsOn": []
+                      },
+                      {
+                        "id": "registration-agent",
+                        "type": "registration-activity",
+                        "dependsOn": [
+                          "kc-client-provisioner"
+                        ]
+                      },
+                      {
+                        "id": "connector-provisioner",
+                        "type": "edcv-activity",
+                        "dependsOn": [
+                          "kc-client-provisioner"
+                        ]
+                      },
+                      {
+                        "id": "onboarding-agent",
+                        "type": "onboarding-activity",
+                        "dependsOn": [
+                          "connector-provisioner",
+                          "registration-agent"
+                        ]
+                      }
+                    ]
+                  },
                   "description": "Orchestrates the deployment of a new dataspace member",
                   "schema": {},
                   "type": "cfm.orchestration.vpa.deploy",
-                  "id": "'"${DEPLOY_ORCH_ID}"'"
+                  "id": "cfm.orchestration.vpa.deploy"
                 }'
 
-              echo "✓ Deploy orchestration definition created (ID: ${DEPLOY_ORCH_ID})"
+              echo "✓ Deploy orchestration definition created (ID: cfm.orchestration.vpa.deploy)"
               
               
               echo ""
