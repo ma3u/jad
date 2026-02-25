@@ -11,6 +11,7 @@
   - [4.3 CFM Pod Labels vs Deployment Names](#43-cfm-pod-labels-vs-deployment-names)
 - [5. Standard Reset Procedure](#5-standard-reset-procedure)
 - [6. DB Schema Note](#6-db-schema-note)
+- [7. Test Coverage](#7-test-coverage)
 
 ---
 
@@ -132,4 +133,10 @@ kubectl -n edc-v exec deployment/postgres -- psql -U cp -d controlplane -c "\d e
 ```
 
 Applied fix for this deployment: `ALTER TABLE edc_transfer_process ADD COLUMN data_address_alias TEXT;`
+
+---
+
+## 7. Test Coverage
+
+See [docs/test-overview.md](docs/test-overview.md) for the full test overview report covering what is exercised from the Dataspace Protocol (DSP) and Decentralized Claims Protocol (DCP).
 
