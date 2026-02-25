@@ -1,5 +1,11 @@
 # Test Overview Report
 
+This report covers tests for the following Eclipse Dataspace protocol specifications:
+
+- **[Eclipse Dataspace Protocol (DSP)](https://projects.eclipse.org/projects/technology.dataspace-protocol-base)** — Catalog, Contract Negotiation, and Transfer Process protocols enabling interoperable data sharing between participants.
+- **[Eclipse Dataspace Decentralized Claims Protocol (DCP)](https://projects.eclipse.org/projects/technology.dataspace-dcp)** — Credential issuance, presentation, and policy enforcement overlay over DSP.
+- **[Eclipse Data Plane Signaling (DPS)](https://projects.eclipse.org/projects/technology.dataplane-signaling)** — Protocol state machine, message types, and HTTP APIs for control plane ↔ data plane communication (start, suspend, complete, terminate data flows).
+
 ## Table of Contents
 
 1. [Scope and Test Types](#1-scope-and-test-types)
@@ -8,6 +14,7 @@
    - [3.1 Catalog Protocol](#31-catalog-protocol)
    - [3.2 Contract Negotiation Protocol](#32-contract-negotiation-protocol)
    - [3.3 Transfer Process Protocol](#33-transfer-process-protocol)
+   - [3.4 Data Plane Signaling (DPS)](#34-data-plane-signaling-dps)
 4. [Decentralized Claims Protocol (DCP) Coverage](#4-decentralized-claims-protocol-dcp-coverage)
    - [4.1 Credential Issuance](#41-credential-issuance)
    - [4.2 Credential Presentation and Policy Evaluation](#42-credential-presentation-and-policy-evaluation)
@@ -51,7 +58,9 @@ Run command:
 | **DSP** | Transfer Process Protocol — PULL (HttpData-PULL) | ✅ | `testCertDataTransfer` |
 | **DSP** | Endpoint Data Reference (EDR) — token retrieval | ✅ | `testCertDataTransfer` (explicit EDR map) |
 | **DSP** | Endpoint Data Reference (EDR) — data download with token | ✅ | `testCertDataTransfer` (auth token → dataplane) |
-| **DSP** | Dataplane registration / Signaling | ⚠️ | Workaround via custom `DataplaneRegistrationApiController` |
+| **DPS** | Dataplane registration | ⚠️ | Workaround via custom `DataplaneRegistrationApiController` (DPS not fully implemented) |
+| **DPS** | Transfer start signal (control plane → data plane) | ✅ | Exercised implicitly in all 3 transfer tests |
+| **DPS** | Dataplane state machine (STARTED → COMPLETED) | ⚠️ | Happy path only; SUSPENDED/TERMINATED not tested |
 | **DCP** | Credential issuance — VC issued by IssuerService | ✅ | `@BeforeAll` fixture — polls until `ISSUED` |
 | **DCP** | Credential type: MembershipCredential | ✅ | All 3 test cases |
 | **DCP** | Credential type: ManufacturerCredential | ✅ | `testTransferLimitedAccess` |
@@ -116,6 +125,19 @@ For the PULL transfer (`testCertDataTransfer`), the EDR (auth token + endpoint U
 POST /app/public/api/data/certs/request
 Authorization: <EDR auth token>
 ```
+
+### 3.4 Data Plane Signaling (DPS)
+
+[Eclipse Data Plane Signaling](https://projects.eclipse.org/projects/technology.dataplane-signaling) defines the protocol by which the control plane instructs the data plane to start, suspend, complete, or terminate a data flow. It specifies a state machine, JSON message types, and HTTP RESTful APIs.
+
+**Current implementation status:** DPS is not yet fully implemented in this stack. Dataplane registration uses a custom workaround endpoint (`DataplaneRegistrationApiController` in `extensions/api/mgmt`) instead of the DPS-compliant registration flow.
+
+| DPS interaction | Triggered by | Status |
+|-----------------|-------------|--------|
+| Dataplane registration (`POST /api/mgmt/v4alpha/dataplanes/{participantId}`) | `registerDataPlane()` in test setup | ⚠️ Custom workaround, not DPS-spec |
+| Transfer start signal (control plane → `http://dataplane.edc-v.svc.cluster.local:8083/api/control/v1/dataflows`) | DSP Transfer Process initiation | ✅ Exercised in all 3 transfer tests |
+| Transfer STARTED → data available | Consumer receives EDR / data response | ✅ Verified via HTTP 200 assertions |
+| Transfer COMPLETED / TERMINATED lifecycle | — | ❌ Not tested |
 
 ---
 
@@ -201,7 +223,7 @@ Both expressions are registered for scopes: `catalog`, `contract.negotiation`, `
 - HTTP 200
 - Response body is non-null JSON (todo items from jsonplaceholder)
 
-**Protocols exercised:** DSP Catalog, DSP Contract Negotiation, DSP Transfer Process, DCP MembershipCredential evaluation
+**Protocols exercised:** DSP Catalog, DSP Contract Negotiation, DSP Transfer Process, DPS transfer start signal, DCP MembershipCredential evaluation
 
 ---
 
@@ -224,7 +246,7 @@ Both expressions are registered for scopes: `catalog`, `contract.negotiation`, `
 - `/transfer` returns HTTP 200 with EDR map containing `authToken`
 - Dataplane cert request returns HTTP 200 with empty list
 
-**Protocols exercised:** DSP Catalog, DSP Contract Negotiation, DSP Transfer Process (PULL), EDR token exchange, DCP MembershipCredential evaluation
+**Protocols exercised:** DSP Catalog, DSP Contract Negotiation, DSP Transfer Process (PULL), DPS transfer start signal, EDR token exchange, DCP MembershipCredential evaluation
 
 ---
 
@@ -247,7 +269,7 @@ Both expressions are registered for scopes: `catalog`, `contract.negotiation`, `
 4. Manufacturer (has MembershipCredential + ManufacturerCredential) calls `/data`
 5. **Asserts HTTP 200** — expected success
 
-**Protocols exercised:** DSP Catalog, DSP Contract Negotiation (both pass and fail paths), DSP Transfer Process, DCP ManufacturerCredential evaluation (positive and negative enforcement)
+**Protocols exercised:** DSP Catalog, DSP Contract Negotiation (both pass and fail paths), DSP Transfer Process, DPS transfer start signal, DCP ManufacturerCredential evaluation (positive and negative enforcement)
 
 ---
 
@@ -297,7 +319,8 @@ These collections are not part of the automated test run. They serve as the manu
 | DSP Catalog Protocol — filtering / pagination | No tests for catalog query parameters |
 | DSP Contract Negotiation — consumer-initiated termination | No test for `TERMINATED` negotiation state |
 | DSP Transfer Process — `SUSPENDED` / `COMPLETED` lifecycle events | Only happy-path start→active→data is tested |
-| DSP Dataplane Signaling | Not fully implemented; workaround uses custom `DataplaneRegistrationApiController` |
+| DPS — dataplane registration | Not fully implemented; workaround uses custom `DataplaneRegistrationApiController` (see [section 3.4](#34-data-plane-signaling-dps)) |
+| DPS — COMPLETED / TERMINATED / SUSPENDED state transitions | Transfer lifecycle beyond STARTED not exercised |
 | DCP — credential revocation | No test for revoked VC being rejected |
 | DCP — credential expiry | CEL expressions check `membershipStartDate`/`since` but no test for expired VCs |
 | DCP — multiple issuers / cross-tenant issuance | Only single IssuerService instance tested |
