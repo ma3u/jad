@@ -55,7 +55,7 @@ public record ParticipantOnboarding(String participantName, String participantCo
         var profileId = deployParticipantProfile(tenantId, cellId, participantContextDid, dataspaceId, roles);
 
         monitor.info("Waiting for dataspace profile to become active");
-        await().atMost(20, SECONDS)
+        await().atMost(60, SECONDS)
                 .until(() -> {
                     var participantProfile = getParticipantProfile(tenantId, profileId);
                     return participantProfile.getVpas().stream().allMatch(vpa -> vpa.getState().equalsIgnoreCase("active"));

@@ -18,6 +18,14 @@ This report documents the local deployment run on macOS, aligned to `README.md` 
 6. App deploy: ✅ completed (`k8s/apps` applied).
 7. Seed jobs stabilization: ✅ completed after manifest fixes (`provision-manager-seed`, `redline-seed`).
 8. Final verification: ✅ completed (all deployments available, all seed jobs complete).
+9. Bruno CLI setup: ✅ completed (`@usebruno/cli` installed; env `KinD Local 8080` added).
+10. Bruno onboarding runs: ⚠️ executed with partial failures (vault-secret retrieval and profile assertions).
+11. CEL seeding run: ✅ executed successfully via Bruno.
+12. Provider seeding and transfer runs: ❌ executed but failed (asset/catalog/data transfer requests).
+13. End-to-end test run: ❌ executed; failed with onboarding timeout in `DataTransferEndToEndTest`.
+14. Cleanup run: ✅ completed (`kubectl delete -k k8s/`), namespace resources removed.
+15. IssuerService seed latency investigation (2026-02-25): ✅ completed; measured runtime and applied readiness-loop optimization.
+16. Clean redeploy + re-validation run (2026-02-25): ❌ completed; transfer and end-to-end onboarding still failing.
 
 ## README flow status
 
@@ -65,27 +73,56 @@ This report documents the local deployment run on macOS, aligned to `README.md` 
 ### 5) Prepare dataspace (Bruno requests)
 
 - README indicates running onboarding/provisioning request collections manually.
-- Status in this run: ⚠️ Partially simulated via seed jobs, not via Bruno GUI collections.
+- Status in this run: ⚠️ Executed via Bruno CLI automation (not GUI), with partial failures.
+- Commands executed:
+  - `bru run "CFM - Provision Consumer" -r --env "KinD Local 8080"`
+  - `bru run "CFM - Provision Provider" -r --env "KinD Local 8080"`
+- Result files:
+  - `build/bru-provision-consumer.json`
+  - `build/bru-provision-provider.json`
+- Outcome summary:
+  - Tenant creation and deployment profile calls succeeded (`201/202`).
+  - `Get Participant Profile` assertions and `Obtain Secret from Vault` failed (`404`) in both consumer/provider flows.
 
 ### Seeding EDC-V CEL expressions
 
-- Status: ⏭️ Not executed in this run.
+- Status: ✅ Executed successfully.
+- Command: `bru run "EDC-V Management/Prepare Consumer Participant" -r --env "KinD Local 8080"`
+- Result file: `build/bru-cel-seeding.json`
+- Outcome: all CEL-related requests passed.
 
 ### Seeding provider assets/policies/contracts (Bruno)
 
-- Status: ⏭️ Not executed in this run.
+- Status: ❌ Executed, but failed.
+- Command: `bru run "EDC-V Management/Prepare Provider Participant" -r --env "KinD Local 8080"`
+- Result file: `build/bru-provider-seeding.json`
+- Outcome: dataplane prep passed (`204`), but asset/policy/contract requests returned `404`.
 
 ### Transfer data use cases
 
-- Status: ⏭️ Not executed in this run.
+- Status: ❌ Executed, but failed.
+- Command: `bru run "EDC-V Management/Data Transfer" -r --env "KinD Local 8080"`
+- Result file: `build/bru-data-transfer.json`
+- Outcome: catalog/data and cert transfer flows failed (`404/415/500`), including missing local upload file for cert scenario.
+- Latest rerun (2026-02-25): ❌ still failing.
+  - Command: `bru run "EDC-V Management/Data Transfer" -r --env "KinD Local 8080" --output ../../build/bru-data-transfer-20260225.json --format json --insecure`
+  - Result file: `build/bru-data-transfer-20260225.json`
+  - Outcome: all 8 requests failed again, with the same `404/415/500` pattern; cert upload still points to a non-existent local file path.
 
 ### Automated tests (`./gradlew test -DincludeTags="EndToEndTest"`)
 
-- Status: ⏭️ Not executed in this run.
+- Status: ❌ Executed, but failed.
+- Command: `./gradlew test -DincludeTags="EndToEndTest"`
+- Outcome: `DataTransferEndToEndTest` failed with `ConditionTimeoutException` during participant onboarding.
+- Latest rerun (2026-02-25): ❌ still failing.
+  - Command: `./gradlew test -DincludeTags="EndToEndTest"`
+  - Outcome: unchanged `ConditionTimeoutException` in `ParticipantOnboarding.execute` (20s timeout).
 
 ### Cleanup (`kubectl delete -k k8s/`)
 
-- Status: ⏭️ Not executed (cluster intentionally kept running).
+- Status: ✅ Executed.
+- Command: `kubectl delete -k k8s/`
+- Verification: `kubectl get all -n edc-v` returned `No resources found in edc-v namespace`.
 
 ## Problematic jobs and fixes applied
 
@@ -113,22 +150,48 @@ This report documents the local deployment run on macOS, aligned to `README.md` 
   - Made dataplane/partner registration calls non-fatal (`|| true`) to avoid job deadlock on duplicate/temporary API issues.
 - Result: Job now completes successfully.
 
-## Current final status (post-fix)
+### C) `issuerservice-seed` (investigated for perceived slowness)
 
-- Jobs in `edc-v`: all `Complete`.
-  - `issuerservice-seed`: ✅
-  - `provision-manager-seed`: ✅
-  - `redline-seed`: ✅
-  - `tenant-manager-seed`: ✅
-  - `vault-bootstrap`: ✅
-- Deployments in `edc-v`: all `1/1` available.
+- Observation: `job.batch/issuerservice-seed condition met` looked slow during full rollout waits.
+- Measured runtime (2026-02-25):
+  - Job wall clock: `31s` (`startTime=2026-02-24T21:03:59Z`, `completionTime=2026-02-24T21:04:30Z`).
+  - Init container (`wait-for-issuerservice`): ~`20s`.
+  - Main seed container: ~`2s`.
+- Conclusion: delay is mostly readiness polling/scheduling overhead, not seed API calls.
+- Optimization applied in `k8s/apps/issuerservice-seed-job.yaml`:
+  - Reduced readiness polling interval from `5s` to `1s`.
+  - Added bounded timeout (`MAX_ATTEMPTS=180`) with clearer diagnostics.
+- Caveat: ad-hoc reruns of seed jobs on an already seeded cluster are not fully idempotent and can fail with `BackoffLimitExceeded`.
+
+## Current final status (after next steps)
+
+- Cleanup completed; JAD resources were removed from `edc-v`.
+- `kubectl get all -n edc-v` shows no remaining resources.
+- Bruno and test outputs are available for diagnosis in:
+  - `build/bru-provision-consumer.json`
+  - `build/bru-provision-provider.json`
+  - `build/bru-cel-seeding.json`
+  - `build/bru-provider-seeding.json`
+  - `build/bru-data-transfer.json`
+  - `tests/end2end/build/reports/tests/test/index.html`
+
+## Latest status update (2026-02-25)
+
+- Cluster workloads: deployments are healthy (`1/1` available), but not all seed jobs are green in the current workspace state.
+  - Complete: `issuerservice-seed`, `provision-manager-seed`, `tenant-manager-seed`, `vault-bootstrap`.
+  - Running: `redline-seed`.
+- Transfer flow (`EDC-V Management/Data Transfer`): still not verified as successful end-to-end after latest changes.
+- End-to-end tests (`./gradlew test -DincludeTags="EndToEndTest"`): rerun and still failing with participant onboarding timeout.
+- Bottom line: **No, all steps are not successful yet**; transfer and e2e onboarding remain unresolved.
 
 ## Files changed for deployment fixes
 
 - `k8s/apps/provision-manager-seed-job.yaml`
 - `k8s/apps/redline-seed-job.yaml`
+- `k8s/apps/issuerservice-seed-job.yaml`
 
 ## Additional notes
 
 - Docker Desktop visibility: with KinD, workloads run inside the KinD node container (`edcv-control-plane`) and are best inspected via `kubectl`/Lens/K9s.
 - `./gradlew dockerize` is currently healthy in this workspace (last run: `BUILD SUCCESSFUL`).
+- Bruno CLI was installed during this run: `@usebruno/cli`.

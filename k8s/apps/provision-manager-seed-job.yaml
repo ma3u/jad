@@ -43,7 +43,7 @@ spec:
                 sleep 5
               done
               echo "Provision Manager is ready!"
-      containers:
+        # Seed activity and orchestration definitions via PM API
         - name: seed-provision-manager
           image: curlimages/curl:latest
           env:
@@ -138,6 +138,8 @@ spec:
               echo "Step 6: Create Orchestration Definition (deploy)"
               echo "------------------------------------------------"
 
+              DEPLOY_ORCH_ID=$(cat /proc/sys/kernel/random/uuid)
+
               curl -sf -X POST "${PM_BASE_URL}/api/v1alpha1/orchestration-definitions" \
                 -H "Content-Type: application/json" \
                 -d '{
@@ -175,13 +177,16 @@ spec:
                   "description": "Orchestrates the deployment of a new dataspace member",
                   "schema": {},
                   "type": "cfm.orchestration.vpa.deploy",
-                  "id": "cfm.orchestration.vpa.deploy"
+                  "id": "'"${DEPLOY_ORCH_ID}"'"
                 }'
 
-              echo "✓ Deploy orchestration definition created (ID: cfm.orchestration.vpa.deploy)"
-              
-              
+              echo "✓ Deploy orchestration definition created (ID: ${DEPLOY_ORCH_ID})"
+
               echo ""
               echo "================================================"
               echo "ProvisionManager seeding completed!"
               echo "================================================"
+      containers:
+        - name: seed-complete
+          image: busybox:latest
+          command: ["sh", "-c", "echo 'ProvisionManager seed job complete!'"]

@@ -41,9 +41,16 @@ spec:
             - sh
             - -c
             - |
-              until curl -sf http://issuerservice.edc-v.svc.cluster.local:10010/api/check/readiness; do
-                echo "Waiting for issuerservice to be ready..."
-                sleep 5
+              MAX_ATTEMPTS=180
+              ATTEMPT=1
+              until curl -sf http://issuerservice.edc-v.svc.cluster.local:10010/api/check/readiness > /dev/null; do
+                if [ "$ATTEMPT" -ge "$MAX_ATTEMPTS" ]; then
+                  echo "IssuerService readiness check timed out after ${MAX_ATTEMPTS}s"
+                  exit 1
+                fi
+                echo "Waiting for issuerservice to be ready... (${ATTEMPT}/${MAX_ATTEMPTS})"
+                ATTEMPT=$((ATTEMPT+1))
+                sleep 1
               done
               echo ""
               echo "IssuerService is ready!"

@@ -10,14 +10,52 @@ get {
   auth: inherit
 }
 
-vars:pre-request {
-  test_tenant_id: 3fa9401d-6f47-459d-a4ea-3c6d606633c5
-}
-
 script:post-response {
   let body = res.getBody()
   
+  // Poll until VPAs become active (orchestration takes up to ~90 seconds)
+  // NOTE: await inside for/while loops doesn't block in QuickJS collection runner.
+  // Use sequential top-level if/await pattern instead.
+  const tenantId = bru.getVar("tenant_id");
+  const profileId = bru.getVar("participant_profile_id");
+  const tmBaseUrl = bru.getEnvVar("tmBaseUrl");
+  const url = tmBaseUrl + "/api/v1alpha1/tenants/" + tenantId + "/participant-profiles/" + profileId;
   
+  async function pollOnce() {
+    await bru.sleep(2000);
+    try { let r = await axios.get(url); if (r && r.data) { body = r.data; } } catch(e) {}
+  }
+  
+  if (!body || !body.properties || !body.properties["cfm.vpa.state"]) { await pollOnce(); }
+  if (!body || !body.properties || !body.properties["cfm.vpa.state"]) { await pollOnce(); }
+  if (!body || !body.properties || !body.properties["cfm.vpa.state"]) { await pollOnce(); }
+  if (!body || !body.properties || !body.properties["cfm.vpa.state"]) { await pollOnce(); }
+  if (!body || !body.properties || !body.properties["cfm.vpa.state"]) { await pollOnce(); }
+  if (!body || !body.properties || !body.properties["cfm.vpa.state"]) { await pollOnce(); }
+  if (!body || !body.properties || !body.properties["cfm.vpa.state"]) { await pollOnce(); }
+  if (!body || !body.properties || !body.properties["cfm.vpa.state"]) { await pollOnce(); }
+  if (!body || !body.properties || !body.properties["cfm.vpa.state"]) { await pollOnce(); }
+  if (!body || !body.properties || !body.properties["cfm.vpa.state"]) { await pollOnce(); }
+  if (!body || !body.properties || !body.properties["cfm.vpa.state"]) { await pollOnce(); }
+  if (!body || !body.properties || !body.properties["cfm.vpa.state"]) { await pollOnce(); }
+  if (!body || !body.properties || !body.properties["cfm.vpa.state"]) { await pollOnce(); }
+  if (!body || !body.properties || !body.properties["cfm.vpa.state"]) { await pollOnce(); }
+  if (!body || !body.properties || !body.properties["cfm.vpa.state"]) { await pollOnce(); }
+  if (!body || !body.properties || !body.properties["cfm.vpa.state"]) { await pollOnce(); }
+  if (!body || !body.properties || !body.properties["cfm.vpa.state"]) { await pollOnce(); }
+  if (!body || !body.properties || !body.properties["cfm.vpa.state"]) { await pollOnce(); }
+  if (!body || !body.properties || !body.properties["cfm.vpa.state"]) { await pollOnce(); }
+  if (!body || !body.properties || !body.properties["cfm.vpa.state"]) { await pollOnce(); }
+  if (!body || !body.properties || !body.properties["cfm.vpa.state"]) { await pollOnce(); }
+  if (!body || !body.properties || !body.properties["cfm.vpa.state"]) { await pollOnce(); }
+  if (!body || !body.properties || !body.properties["cfm.vpa.state"]) { await pollOnce(); }
+  if (!body || !body.properties || !body.properties["cfm.vpa.state"]) { await pollOnce(); }
+  if (!body || !body.properties || !body.properties["cfm.vpa.state"]) { await pollOnce(); }
+  if (!body || !body.properties || !body.properties["cfm.vpa.state"]) { await pollOnce(); }
+  if (!body || !body.properties || !body.properties["cfm.vpa.state"]) { await pollOnce(); }
+  if (!body || !body.properties || !body.properties["cfm.vpa.state"]) { await pollOnce(); }
+  if (!body || !body.properties || !body.properties["cfm.vpa.state"]) { await pollOnce(); }
+  if (!body || !body.properties || !body.properties["cfm.vpa.state"]) { await pollOnce(); }
   
   test("Should have VPA state", function () {
     expect(body).to.have.property("properties");

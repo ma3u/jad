@@ -16,7 +16,7 @@ script:post-response {
       expect(body[0]).to.have.property("id");
   });
   
-  if (body && body[0].id) {
+  if (body && body.length > 0 && body[0].id) {
       bru.setVar("dataspace_id", body[0].id);
   } 
 }

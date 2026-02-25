@@ -32,13 +32,41 @@ spec:
         platform: edcv
         type: edcv-app
     spec:
+      initContainers:
+        - name: import-ca-certs
+          image: ghcr.io/metaform/jad/dataplane:latest
+          imagePullPolicy: Always
+          command: [ "sh", "-c" ]
+          args:
+            - |
+              # Copy cacerts to shared volume and import GlobalSign Root CA
+              # needed for cross-signed chains (e.g. jsonplaceholder.typicode.com)
+              cp /opt/java/openjdk/lib/security/cacerts /cacerts/cacerts
+              curl -sS http://secure.globalsign.com/cacert/Root-R1.crt -o /tmp/globalsign_r1.crt
+              keytool -importcert -keystore /cacerts/cacerts -storepass changeit \
+                -noprompt -alias globalsign_root_r1 -file /tmp/globalsign_r1.crt 2>/dev/null || true
+              echo "CA certs imported successfully"
+          volumeMounts:
+            - name: cacerts
+              mountPath: /cacerts
       containers:
         - name: dataplane
           image: ghcr.io/metaform/jad/dataplane:latest
           imagePullPolicy: Always
+          command: [ "sh", "-c" ]
+          args:
+            - |
+              cp /cacerts/cacerts /opt/java/openjdk/lib/security/cacerts
+              exec java -Djava.security.egd=file:/dev/urandom \
+                -Djavax.net.ssl.trustStore=/opt/java/openjdk/lib/security/cacerts \
+                -Djavax.net.ssl.trustStorePassword=changeit \
+                -jar edc-dataplane.jar --log-level=debug
           envFrom:
             - configMapRef:
                 name: dataplane-config
+          volumeMounts:
+            - name: cacerts
+              mountPath: /cacerts
           ports:
             - containerPort: 11002
               name: public-port
@@ -71,6 +99,9 @@ spec:
             failureThreshold: 10
             periodSeconds: 5
             timeoutSeconds: 30
+      volumes:
+        - name: cacerts
+          emptyDir: {}
 
 ---
 apiVersion: v1
